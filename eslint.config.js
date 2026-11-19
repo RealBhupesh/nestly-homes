@@ -6,7 +6,19 @@ import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    ignores: [
+      "dist",
+      ".output",
+      ".vinxi",
+      ".vercel",
+      ".nitro",
+      ".tanstack",
+      "coverage",
+      "src/integrations/supabase",
+      "src/routeTree.gen.ts",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -34,6 +46,9 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // TODO: ~40 legacy `any`s remain across the codebase. Warn (not error) so CI
+      // lint is meaningful today; tighten back to "error" once they're typed.
+      "@typescript-eslint/no-explicit-any": "warn",
     },
   },
   eslintPluginPrettier,

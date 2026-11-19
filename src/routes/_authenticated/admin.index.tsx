@@ -1,7 +1,19 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getAdminOverview, getAdminTimeseries } from "@/lib/admin.functions";
-import { Building2, CheckCircle2, FileEdit, Archive, Star, ImageIcon, Users, TrendingUp, TrendingDown, ArrowUpRight, Sparkles } from "lucide-react";
+import {
+  Building2,
+  CheckCircle2,
+  FileEdit,
+  Archive,
+  Star,
+  ImageIcon,
+  Users,
+  TrendingUp,
+  TrendingDown,
+  ArrowUpRight,
+  Sparkles,
+} from "lucide-react";
 import { AreaChart, Area, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { LiveIndicator } from "@/components/nestly/LiveIndicator";
@@ -22,30 +34,77 @@ function AdminOverview() {
   const refresh = () => {
     Promise.all([
       getAdminOverview().then(setData),
-      getAdminTimeseries({ data: { days: 30 } }).then(setSeries).catch(() => {}),
+      getAdminTimeseries({ data: { days: 30 } })
+        .then(setSeries)
+        .catch(() => {}),
     ])
       .then(() => setLastUpdated(new Date()))
       .catch((e) => setErr(e.message));
   };
-  useEffect(() => { refresh(); }, []);
-  useRealtimeRefresh(["listings", "listing_reviews", "profiles"], refresh, { channelName: "admin-overview" });
+  useEffect(() => {
+    refresh();
+  }, []);
+  useRealtimeRefresh(["listings", "listing_reviews", "profiles"], refresh, {
+    channelName: "admin-overview",
+  });
 
   if (err) return <p className="text-sm text-red-600">{err}</p>;
   if (!data) return <OverviewSkeleton />;
 
   const stats = [
-    { label: "Total listings", value: data.counts.listings, icon: Building2, tone: "ink", to: "/admin/listings" },
-    { label: "Published", value: data.counts.published, icon: CheckCircle2, tone: "emerald", to: "/admin/listings" },
-    { label: "Drafts", value: data.counts.drafts, icon: FileEdit, tone: "amber", to: "/admin/listings" },
-    { label: "Archived", value: data.counts.archived, icon: Archive, tone: "slate", to: "/admin/listings" },
-    { label: "Reviews", value: data.counts.reviews, icon: Star, tone: "coral", to: "/admin/reviews" },
-    { label: "Photos", value: data.counts.photos, icon: ImageIcon, tone: "violet", to: "/admin/photos" },
+    {
+      label: "Total listings",
+      value: data.counts.listings,
+      icon: Building2,
+      tone: "ink",
+      to: "/admin/listings",
+    },
+    {
+      label: "Published",
+      value: data.counts.published,
+      icon: CheckCircle2,
+      tone: "emerald",
+      to: "/admin/listings",
+    },
+    {
+      label: "Drafts",
+      value: data.counts.drafts,
+      icon: FileEdit,
+      tone: "amber",
+      to: "/admin/listings",
+    },
+    {
+      label: "Archived",
+      value: data.counts.archived,
+      icon: Archive,
+      tone: "slate",
+      to: "/admin/listings",
+    },
+    {
+      label: "Reviews",
+      value: data.counts.reviews,
+      icon: Star,
+      tone: "coral",
+      to: "/admin/reviews",
+    },
+    {
+      label: "Photos",
+      value: data.counts.photos,
+      icon: ImageIcon,
+      tone: "violet",
+      to: "/admin/photos",
+    },
     { label: "Users", value: data.counts.users, icon: Users, tone: "sky", to: "/admin/users" },
   ] as const;
 
   const last7Listings = (series ?? []).slice(-7).reduce((a, b) => a + b.listings, 0);
   const prev7Listings = (series ?? []).slice(-14, -7).reduce((a, b) => a + b.listings, 0);
-  const trend = prev7Listings === 0 ? (last7Listings > 0 ? 100 : 0) : Math.round(((last7Listings - prev7Listings) / prev7Listings) * 100);
+  const trend =
+    prev7Listings === 0
+      ? last7Listings > 0
+        ? 100
+        : 0
+      : Math.round(((last7Listings - prev7Listings) / prev7Listings) * 100);
   const positive = trend >= 0;
 
   return (
@@ -61,23 +120,35 @@ function AdminOverview() {
             </div>
             <h1 className="mt-2 text-2xl font-medium tracking-tight sm:text-4xl">Welcome back.</h1>
             <p className="mt-2 max-w-lg text-[12.5px] text-cream/70 sm:text-[13px]">
-              A live snapshot of your marketplace. Moderate content, watch trends, and keep the community healthy — all from one place.
+              A live snapshot of your marketplace. Moderate content, watch trends, and keep the
+              community healthy — all from one place.
             </p>
             <div className="mt-5 flex flex-wrap items-center gap-2">
-              <Link to="/admin/listings" className="inline-flex items-center gap-1.5 rounded-full bg-cream px-4 py-1.5 text-[12px] font-medium text-ink transition hover:bg-cream/90">
+              <Link
+                to="/admin/listings"
+                className="inline-flex items-center gap-1.5 rounded-full bg-cream px-4 py-1.5 text-[12px] font-medium text-ink transition hover:bg-cream/90"
+              >
                 Review listings <ArrowUpRight className="h-3.5 w-3.5" />
               </Link>
-              <Link to="/admin/reviews" className="inline-flex items-center gap-1.5 rounded-full border border-cream/25 px-4 py-1.5 text-[12px] text-cream/85 transition hover:border-cream/50 hover:text-cream">
+              <Link
+                to="/admin/reviews"
+                className="inline-flex items-center gap-1.5 rounded-full border border-cream/25 px-4 py-1.5 text-[12px] text-cream/85 transition hover:border-cream/50 hover:text-cream"
+              >
                 Moderate reviews
               </Link>
             </div>
           </div>
           <div className="flex flex-wrap items-center gap-2 text-[12px] sm:flex-col sm:items-end">
             <LiveIndicator lastUpdated={lastUpdated} />
-            <span className="whitespace-nowrap rounded-full border border-cream/20 bg-cream/5 px-3 py-1 text-cream/70">Last 30 days</span>
-            <span className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 ${positive ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200"}`}>
+            <span className="whitespace-nowrap rounded-full border border-cream/20 bg-cream/5 px-3 py-1 text-cream/70">
+              Last 30 days
+            </span>
+            <span
+              className={`inline-flex items-center gap-1 whitespace-nowrap rounded-full px-3 py-1 ${positive ? "bg-emerald-400/15 text-emerald-200" : "bg-rose-400/15 text-rose-200"}`}
+            >
               {positive ? <TrendingUp className="h-3 w-3" /> : <TrendingDown className="h-3 w-3" />}
-              {positive ? "+" : ""}{trend}% listings WoW
+              {positive ? "+" : ""}
+              {trend}% listings WoW
             </span>
           </div>
         </div>
@@ -85,7 +156,9 @@ function AdminOverview() {
 
       {/* KPI grid */}
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
-        {stats.map((s) => <KpiCard key={s.label} {...s} />)}
+        {stats.map((s) => (
+          <KpiCard key={s.label} {...s} />
+        ))}
       </div>
 
       <section className="rounded-3xl border border-border/60 bg-card p-4 shadow-sm sm:p-6">
@@ -117,12 +190,35 @@ function AdminOverview() {
                   <stop offset="100%" stopColor="#f59e0b" stopOpacity={0} />
                 </linearGradient>
               </defs>
-              <XAxis dataKey="date" tickFormatter={(d) => d.slice(5)} fontSize={10} stroke="#9ca3af" />
+              <XAxis
+                dataKey="date"
+                tickFormatter={(d) => d.slice(5)}
+                fontSize={10}
+                stroke="#9ca3af"
+              />
               <YAxis fontSize={10} stroke="#9ca3af" allowDecimals={false} />
               <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
-              <Area type="monotone" dataKey="listings" stroke="#111" fill="url(#gL)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="users" stroke="#8b5cf6" fill="url(#gU)" strokeWidth={1.5} />
-              <Area type="monotone" dataKey="reviews" stroke="#f59e0b" fill="url(#gR)" strokeWidth={1.5} />
+              <Area
+                type="monotone"
+                dataKey="listings"
+                stroke="#111"
+                fill="url(#gL)"
+                strokeWidth={1.5}
+              />
+              <Area
+                type="monotone"
+                dataKey="users"
+                stroke="#8b5cf6"
+                fill="url(#gU)"
+                strokeWidth={1.5}
+              />
+              <Area
+                type="monotone"
+                dataKey="reviews"
+                stroke="#f59e0b"
+                fill="url(#gR)"
+                strokeWidth={1.5}
+              />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -135,7 +231,10 @@ function AdminOverview() {
               <h2 className="text-[15px] font-medium text-ink">Recently updated</h2>
               <p className="text-[12px] text-ink/55">Latest edits across the catalog</p>
             </div>
-            <Link to="/admin/listings" className="inline-flex items-center gap-1 text-[12px] text-ink/60 hover:text-ink">
+            <Link
+              to="/admin/listings"
+              className="inline-flex items-center gap-1 text-[12px] text-ink/60 hover:text-ink"
+            >
               View all <ArrowUpRight className="h-3 w-3" />
             </Link>
           </div>
@@ -167,7 +266,9 @@ function AdminOverview() {
                 </div>
               </li>
             ))}
-            {data.recent.length === 0 && <li className="py-6 text-center text-ink/50">No listings yet.</li>}
+            {data.recent.length === 0 && (
+              <li className="py-6 text-center text-ink/50">No listings yet.</li>
+            )}
           </ul>
         </div>
 
@@ -187,12 +288,17 @@ function AdminOverview() {
                     <span className="text-ink/50">{c.count} listings</span>
                   </div>
                   <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <div className="h-full rounded-full bg-gradient-to-r from-ink to-ink/60 transition-all" style={{ width: `${pct}%` }} />
+                    <div
+                      className="h-full rounded-full bg-gradient-to-r from-ink to-ink/60 transition-all"
+                      style={{ width: `${pct}%` }}
+                    />
                   </div>
                 </li>
               );
             })}
-            {data.topCities.length === 0 && <li className="py-6 text-center text-ink/50">No data yet.</li>}
+            {data.topCities.length === 0 && (
+              <li className="py-6 text-center text-ink/50">No data yet.</li>
+            )}
           </ul>
         </div>
       </section>
@@ -201,16 +307,63 @@ function AdminOverview() {
 }
 
 const TONE: Record<string, { bg: string; ring: string; icon: string; accent: string }> = {
-  ink:     { bg: "from-ink/5 to-transparent",           ring: "ring-ink/10",           icon: "bg-ink text-cream",             accent: "text-ink" },
-  emerald: { bg: "from-emerald-500/10 to-transparent",  ring: "ring-emerald-500/15",   icon: "bg-emerald-500 text-white",     accent: "text-emerald-700" },
-  amber:   { bg: "from-amber-500/10 to-transparent",    ring: "ring-amber-500/15",     icon: "bg-amber-500 text-white",       accent: "text-amber-700" },
-  slate:   { bg: "from-slate-500/10 to-transparent",    ring: "ring-slate-500/15",     icon: "bg-slate-500 text-white",       accent: "text-slate-700" },
-  coral:   { bg: "from-coral/10 to-transparent",        ring: "ring-coral/15",         icon: "bg-coral text-cream",           accent: "text-coral" },
-  violet:  { bg: "from-violet-500/10 to-transparent",   ring: "ring-violet-500/15",    icon: "bg-violet-500 text-white",      accent: "text-violet-700" },
-  sky:     { bg: "from-sky-500/10 to-transparent",      ring: "ring-sky-500/15",       icon: "bg-sky-500 text-white",         accent: "text-sky-700" },
+  ink: {
+    bg: "from-ink/5 to-transparent",
+    ring: "ring-ink/10",
+    icon: "bg-ink text-cream",
+    accent: "text-ink",
+  },
+  emerald: {
+    bg: "from-emerald-500/10 to-transparent",
+    ring: "ring-emerald-500/15",
+    icon: "bg-emerald-500 text-white",
+    accent: "text-emerald-700",
+  },
+  amber: {
+    bg: "from-amber-500/10 to-transparent",
+    ring: "ring-amber-500/15",
+    icon: "bg-amber-500 text-white",
+    accent: "text-amber-700",
+  },
+  slate: {
+    bg: "from-slate-500/10 to-transparent",
+    ring: "ring-slate-500/15",
+    icon: "bg-slate-500 text-white",
+    accent: "text-slate-700",
+  },
+  coral: {
+    bg: "from-coral/10 to-transparent",
+    ring: "ring-coral/15",
+    icon: "bg-coral text-cream",
+    accent: "text-coral",
+  },
+  violet: {
+    bg: "from-violet-500/10 to-transparent",
+    ring: "ring-violet-500/15",
+    icon: "bg-violet-500 text-white",
+    accent: "text-violet-700",
+  },
+  sky: {
+    bg: "from-sky-500/10 to-transparent",
+    ring: "ring-sky-500/15",
+    icon: "bg-sky-500 text-white",
+    accent: "text-sky-700",
+  },
 };
 
-function KpiCard({ label, value, icon: Icon, tone, to }: { label: string; value: number; icon: any; tone: string; to: string }) {
+function KpiCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  to,
+}: {
+  label: string;
+  value: number;
+  icon: any;
+  tone: string;
+  to: string;
+}) {
   const t = TONE[tone] ?? TONE.ink;
   return (
     <Link
@@ -224,8 +377,12 @@ function KpiCard({ label, value, icon: Icon, tone, to }: { label: string; value:
         </span>
         <ArrowUpRight className="h-3.5 w-3.5 text-ink/25 transition group-hover:text-ink" />
       </div>
-      <p className="relative mt-3 text-[11px] font-medium uppercase tracking-wider text-ink/55">{label}</p>
-      <p className="relative mt-1 text-2xl font-medium tracking-tight text-ink">{value.toLocaleString()}</p>
+      <p className="relative mt-3 text-[11px] font-medium uppercase tracking-wider text-ink/55">
+        {label}
+      </p>
+      <p className="relative mt-1 text-2xl font-medium tracking-tight text-ink">
+        {value.toLocaleString()}
+      </p>
     </Link>
   );
 }
@@ -238,7 +395,9 @@ function StatusPill({ status }: { status: string }) {
     pending: "bg-sky-50 text-sky-700 ring-sky-500/20",
   };
   return (
-    <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ring-1 ${map[status] ?? "bg-muted text-ink/70 ring-border"}`}>
+    <span
+      className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-medium capitalize ring-1 ${map[status] ?? "bg-muted text-ink/70 ring-border"}`}
+    >
       {status}
     </span>
   );

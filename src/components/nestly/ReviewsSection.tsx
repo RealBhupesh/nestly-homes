@@ -1,7 +1,193 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
+import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
+import { useAuth } from "@/hooks/use-auth";
+import { submitReport, type ReportTarget } from "@/lib/reports.functions";
+import { shortOwnerName } from "@/lib/listings-data";
+
+const REPORT_REASONS: Record<ReportTarget, string[]> = {
+  listing: [
+    "Fake or misleading listing",
+    "Already rented / sold",
+    "Wrong price or details",
+    "Broker posing as owner",
+    "Scam or asked for advance payment",
+    "Offensive content",
+  ],
+  review: [
+    "Spam or advertising",
+    "Fake review",
+    "Offensive or abusive",
+    "Shares private information",
+  ],
+  user: ["Harassment", "Scam", "Impersonation", "Spam"],
+  message: ["Harassment", "Scam", "Spam", "Offensive content"],
+};
+
+/** Modal to report a listing / review / user / message to moderators. */
+export function ReportDialog({
+  open,
+  onClose,
+  targetType,
+  targetId,
+  targetLabel,
+}: {
+  open: boolean;
+  onClose: () => void;
+  targetType: ReportTarget;
+  targetId: string;
+  targetLabel?: string;
+}) {
+  const { user, loading } = useAuth();
+  const navigate = useNavigate();
+  const href = useRouterState({ select: (s) => s.location.href });
+  const send = useServerFn(submitReport);
+  const [reason, setReason] = useState("");
+  const [details, setDetails] = useState("");
+  const [busy, setBusy] = useState(false);
+
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    setReason("");
+    setDetails("");
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onCloseRef.current();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]);
+
+  if (!open) return null;
+
+  const text = [reason, details.trim()].filter(Boolean).join(" — ").slice(0, 1000);
+
+  const submit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (busy) return;
+    if (text.length < 3) {
+      toast.warning("Pick a reason or describe the problem");
+      return;
+    }
+    setBusy(true);
+    try {
+      const res = await send({ data: { targetType, targetId, reason: text } });
+      toast.success(
+        res.duplicate
+          ? "You've already reported this — we're on it."
+          : "Thanks — our team will review this report.",
+      );
+      onClose();
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : "Could not submit the report");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Report ${targetType}`}
+      className="fixed inset-0 z-[95] flex items-end justify-center p-0 sm:items-center sm:p-4"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-ink/50 backdrop-blur-sm"
+      />
+      <div
+        className="relative z-10 w-full rounded-t-3xl bg-background p-5 shadow-2xl sm:max-w-md sm:rounded-3xl"
+        style={{ paddingBottom: "calc(1.25rem + env(safe-area-inset-bottom))" }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.16em] text-ink/50">
+              Report {targetType}
+            </p>
+            {targetLabel && (
+              <h3 className="mt-1 truncate font-display text-lg font-semibold text-ink">
+                {targetLabel}
+              </h3>
+            )}
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-full border border-ink/10 text-ink hover:bg-ink/[0.04]"
+          >
+            <svg
+              viewBox="0 0 24 24"
+              className="h-4 w-4"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="1.8"
+            >
+              <path d="M6 6l12 12M18 6L6 18" strokeLinecap="round" />
+            </svg>
+          </button>
+        </div>
+        {!loading && !user ? (
+          <div className="mt-4 rounded-2xl border border-dashed border-ink/[0.12] p-4 text-center">
+            <p className="text-sm text-ink/70">
+              Sign in so our moderators can follow up on your report.
+            </p>
+            <button
+              type="button"
+              onClick={() => navigate({ to: "/auth", search: { redirect: href } as never })}
+              className="mt-3 inline-flex rounded-full bg-ink px-4 py-2 text-xs font-semibold text-background"
+            >
+              Sign in to report
+            </button>
+          </div>
+        ) : (
+          <form onSubmit={submit} className="mt-4 space-y-3">
+            <div className="flex flex-wrap gap-2">
+              {REPORT_REASONS[targetType].map((r) => (
+                <button
+                  key={r}
+                  type="button"
+                  onClick={() => setReason((cur) => (cur === r ? "" : r))}
+                  aria-pressed={reason === r}
+                  className={`rounded-full border px-3 py-1.5 text-[12px] font-medium transition ${
+                    reason === r
+                      ? "border-ink bg-ink text-background"
+                      : "border-ink/10 text-ink/75 hover:border-ink/30"
+                  }`}
+                >
+                  {r}
+                </button>
+              ))}
+            </div>
+            <textarea
+              value={details}
+              onChange={(e) => setDetails(e.target.value.slice(0, 900))}
+              rows={3}
+              placeholder="Anything else we should know? (optional)"
+              className="w-full resize-none rounded-xl border border-ink/10 bg-background p-3 text-[14px] text-ink outline-none focus:border-ink/40"
+            />
+            <button
+              type="submit"
+              disabled={busy || text.length < 3}
+              className="inline-flex h-11 w-full items-center justify-center rounded-full bg-ink px-4 text-[13.5px] font-semibold text-background hover:brightness-110 disabled:opacity-50"
+            >
+              {busy ? "Sending…" : "Submit report"}
+            </button>
+            <p className="text-center text-[11px] text-ink/50">
+              Reports are confidential. The other person won't see who reported them.
+            </p>
+          </form>
+        )}
+      </div>
+    </div>
+  );
+}
 
 type Review = {
   id: string;
@@ -15,7 +201,15 @@ type Review = {
   reviewer?: { display_name: string | null; avatar_url: string | null } | null;
 };
 
-function StarRow({ value, onChange, size = 18 }: { value: number; onChange?: (n: number) => void; size?: number }) {
+function StarRow({
+  value,
+  onChange,
+  size = 18,
+}: {
+  value: number;
+  onChange?: (n: number) => void;
+  size?: number;
+}) {
   const [hover, setHover] = useState(0);
   const show = hover || value;
   const interactive = Boolean(onChange);
@@ -34,7 +228,12 @@ function StarRow({ value, onChange, size = 18 }: { value: number; onChange?: (n:
           onClick={interactive ? () => onChange!(n) : undefined}
           className={`transition ${interactive ? "cursor-pointer hover:scale-110" : "cursor-default"}`}
         >
-          <svg viewBox="0 0 24 24" width={size} height={size} className={n <= show ? "fill-coral" : "fill-ink/15"}>
+          <svg
+            viewBox="0 0 24 24"
+            width={size}
+            height={size}
+            className={n <= show ? "fill-coral" : "fill-ink/15"}
+          >
             <path d="M12 2.5l2.9 6 6.6.9-4.8 4.6 1.2 6.5L12 17.4 6.1 20.5l1.2-6.5L2.5 9.4l6.6-.9L12 2.5z" />
           </svg>
         </button>
@@ -66,6 +265,7 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
   const [body, setBody] = useState("");
   const [busy, setBusy] = useState(false);
   const [editing, setEditing] = useState(false);
+  const [reporting, setReporting] = useState<Review | null>(null);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -112,10 +312,12 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
     };
   }, []);
 
-  useEffect(() => { void load(); }, [load]);
+  useEffect(() => {
+    void load();
+  }, [load]);
 
   const myReview = useMemo(
-    () => (userId && reviews ? reviews.find((r) => r.user_id === userId) ?? null : null),
+    () => (userId && reviews ? (reviews.find((r) => r.user_id === userId) ?? null) : null),
     [userId, reviews],
   );
 
@@ -130,8 +332,14 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
   const submit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!userId) return;
-    if (rating < 1) { toast.warning("Pick a rating"); return; }
-    if (body.trim().length < 4) { toast.warning("Say a bit more"); return; }
+    if (rating < 1) {
+      toast.warning("Pick a rating");
+      return;
+    }
+    if (body.trim().length < 4) {
+      toast.warning("Say a bit more");
+      return;
+    }
     setBusy(true);
     const payload = {
       listing_id: listingId,
@@ -144,7 +352,10 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
       .from("listing_reviews")
       .upsert(payload, { onConflict: "listing_id,user_id" });
     setBusy(false);
-    if (error) { toast.error(error.message); return; }
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
     toast.success(myReview ? "Review updated" : "Review posted");
     setEditing(false);
     await load();
@@ -154,8 +365,13 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
     if (!myReview) return;
     if (!confirm("Delete your review?")) return;
     const { error } = await supabase.from("listing_reviews").delete().eq("id", myReview.id);
-    if (error) { toast.error(error.message); return; }
-    setRating(0); setTitle(""); setBody("");
+    if (error) {
+      toast.error(error.message);
+      return;
+    }
+    setRating(0);
+    setTitle("");
+    setBody("");
     toast.success("Review deleted");
     await load();
   };
@@ -186,15 +402,24 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
         <div className="space-y-6">
           {count > 0 && (
             <div className="rounded-2xl border border-ink/[0.08] bg-background p-4">
-              <div className="tabular font-display text-3xl font-semibold text-ink">{avg.toFixed(1)}</div>
-              <div className="mt-1"><StarRow value={Math.round(avg)} size={14} /></div>
-              <div className="mt-1 text-[11.5px] text-ink/55">Based on {count} review{count === 1 ? "" : "s"}</div>
+              <div className="tabular font-display text-3xl font-semibold text-ink">
+                {avg.toFixed(1)}
+              </div>
+              <div className="mt-1">
+                <StarRow value={Math.round(avg)} size={14} />
+              </div>
+              <div className="mt-1 text-[11.5px] text-ink/55">
+                Based on {count} review{count === 1 ? "" : "s"}
+              </div>
               <ul className="mt-4 space-y-1.5">
                 {dist.map((d) => (
                   <li key={d.n} className="flex items-center gap-2 text-[11.5px] text-ink/60">
                     <span className="w-3 tabular">{d.n}</span>
                     <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-ink/[0.06]">
-                      <span className="block h-full rounded-full bg-coral" style={{ width: `${d.pct}%` }} />
+                      <span
+                        className="block h-full rounded-full bg-coral"
+                        style={{ width: `${d.pct}%` }}
+                      />
                     </span>
                     <span className="w-8 text-right tabular">{d.pct}%</span>
                   </li>
@@ -204,17 +429,32 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
           )}
 
           {userId ? (
-            <form onSubmit={submit} className="rounded-2xl border border-ink/[0.08] bg-background p-4">
+            <form
+              onSubmit={submit}
+              className="rounded-2xl border border-ink/[0.08] bg-background p-4"
+            >
               <div className="flex items-center justify-between">
                 <p className="text-[11px] font-semibold uppercase tracking-wider text-ink/50">
-                  {myReview && !editing ? "Your review" : myReview ? "Edit review" : "Write a review"}
+                  {myReview && !editing
+                    ? "Your review"
+                    : myReview
+                      ? "Edit review"
+                      : "Write a review"}
                 </p>
                 {myReview && !editing && (
-                  <button type="button" onClick={() => setEditing(true)} className="text-[11.5px] font-medium text-ink/60 hover:text-ink">Edit</button>
+                  <button
+                    type="button"
+                    onClick={() => setEditing(true)}
+                    className="text-[11.5px] font-medium text-ink/60 hover:text-ink"
+                  >
+                    Edit
+                  </button>
                 )}
               </div>
 
-              <div className="mt-3"><StarRow value={rating} onChange={setRating} /></div>
+              <div className="mt-3">
+                <StarRow value={rating} onChange={setRating} />
+              </div>
 
               <input
                 value={title}
@@ -229,17 +469,32 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
                 placeholder="What was your experience with this place?"
                 className="mt-2 w-full resize-none rounded-lg border border-ink/[0.1] bg-background px-3 py-2 text-sm placeholder:text-ink/40 focus:outline-none focus:ring-2 focus:ring-primary"
               />
-              <div className="mt-1 text-right text-[11px] text-ink/40 tabular">{body.length}/2000</div>
+              <div className="mt-1 text-right text-[11px] text-ink/40 tabular">
+                {body.length}/2000
+              </div>
 
               <div className="mt-3 flex items-center justify-between">
                 {myReview ? (
-                  <button type="button" onClick={remove} className="text-[11.5px] font-medium text-primary hover:underline">Delete</button>
-                ) : <span />}
+                  <button
+                    type="button"
+                    onClick={remove}
+                    className="text-[11.5px] font-medium text-primary hover:underline"
+                  >
+                    Delete
+                  </button>
+                ) : (
+                  <span />
+                )}
                 <div className="flex gap-2">
                   {myReview && editing && (
                     <button
                       type="button"
-                      onClick={() => { setEditing(false); setRating(myReview.rating); setTitle(myReview.title ?? ""); setBody(myReview.body); }}
+                      onClick={() => {
+                        setEditing(false);
+                        setRating(myReview.rating);
+                        setTitle(myReview.title ?? "");
+                        setBody(myReview.body);
+                      }}
                       className="rounded-full px-3 py-1.5 text-xs font-medium text-ink/60 hover:text-ink"
                     >
                       Cancel
@@ -258,7 +513,15 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
           ) : (
             <div className="rounded-2xl border border-dashed border-ink/[0.12] bg-background p-4 text-center">
               <p className="text-sm text-ink/70">Sign in to leave a review.</p>
-              <Link to="/auth" className="mt-3 inline-flex rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-cream shadow-tactile hover:-translate-y-0.5 hover:shadow-lift">
+              <Link
+                to="/auth"
+                search={
+                  {
+                    redirect: typeof window !== "undefined" ? window.location.pathname : undefined,
+                  } as never
+                }
+                className="mt-3 inline-flex rounded-full bg-ink px-4 py-1.5 text-xs font-semibold text-cream shadow-tactile hover:-translate-y-0.5 hover:shadow-lift"
+              >
                 Sign in
               </Link>
             </div>
@@ -276,19 +539,27 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
           ) : list.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-ink/[0.12] p-8 text-center">
               <p className="font-display text-lg font-semibold text-ink">No reviews yet</p>
-              <p className="mt-1 text-sm text-ink/55">Be the first to share what it's like to live here.</p>
+              <p className="mt-1 text-sm text-ink/55">
+                Be the first to share what it's like to live here.
+              </p>
             </div>
           ) : (
             <ul className="space-y-4">
               {list.map((r) => {
-                const name = r.reviewer?.display_name || "Anonymous";
+                const name = r.reviewer?.display_name
+                  ? shortOwnerName(r.reviewer.display_name)
+                  : "Anonymous";
                 const isMine = r.user_id === userId;
                 return (
                   <li key={r.id} className="rounded-2xl border border-ink/[0.08] bg-background p-4">
                     <div className="flex items-start justify-between gap-3">
                       <div className="flex items-center gap-3">
                         {r.reviewer?.avatar_url ? (
-                          <img src={r.reviewer.avatar_url} alt="" className="h-9 w-9 rounded-full object-cover" />
+                          <img
+                            src={r.reviewer.avatar_url}
+                            alt=""
+                            className="h-9 w-9 rounded-full object-cover"
+                          />
                         ) : (
                           <div className="grid h-9 w-9 place-items-center rounded-full bg-ink text-background font-display text-xs font-semibold">
                             {name.charAt(0).toUpperCase()}
@@ -296,7 +567,12 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
                         )}
                         <div>
                           <p className="text-[13px] font-semibold text-ink">
-                            {name} {isMine && <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">You</span>}
+                            {name}{" "}
+                            {isMine && (
+                              <span className="ml-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                                You
+                              </span>
+                            )}
                           </p>
                           <div className="mt-0.5 flex items-center gap-2">
                             <StarRow value={r.rating} size={12} />
@@ -304,9 +580,20 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
                           </div>
                         </div>
                       </div>
+                      {!isMine && (
+                        <button
+                          type="button"
+                          onClick={() => setReporting(r)}
+                          className="shrink-0 rounded-full px-2 py-1 text-[11px] font-medium text-ink/45 hover:bg-ink/[0.04] hover:text-ink"
+                        >
+                          Report
+                        </button>
+                      )}
                     </div>
                     {r.title && <p className="mt-3 text-sm font-semibold text-ink">{r.title}</p>}
-                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink/75">{r.body}</p>
+                    <p className="mt-1 whitespace-pre-line text-sm leading-relaxed text-ink/75">
+                      {r.body}
+                    </p>
                   </li>
                 );
               })}
@@ -314,6 +601,13 @@ export function ReviewsSection({ listingId }: { listingId: string }) {
           )}
         </div>
       </div>
+      <ReportDialog
+        open={reporting !== null}
+        onClose={() => setReporting(null)}
+        targetType="review"
+        targetId={reporting?.id ?? ""}
+        targetLabel={reporting ? reporting.title || reporting.body.slice(0, 60) : undefined}
+      />
     </section>
   );
 }

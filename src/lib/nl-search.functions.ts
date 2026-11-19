@@ -1,14 +1,35 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import { requireSupabaseAuth } from "@/integrations/supabase/auth-middleware";
 
 const InputSchema = z.object({
   query: z.string().min(2).max(500),
 });
 
+// Models sometimes answer with everyday words; map them onto the DB enum.
+const TYPE_ALIASES: Record<string, string> = {
+  flat: "apartment",
+  bhk: "apartment",
+  "1bhk": "apartment",
+  apartments: "apartment",
+  villa: "house",
+  bungalow: "house",
+  independent: "house",
+  "1rk": "studio",
+  rk: "studio",
+  hostel: "pg",
+  "paying guest": "pg",
+  shared: "room",
+};
+
 const FilterSchema = z.object({
   mode: z.enum(["rent", "sale"]).nullable().optional(),
   q: z.string().nullable().optional(),
-  type: z.enum(["any", "room", "pg", "flat", "house"]).nullable().optional(),
+  // Matches the DB enum public.property_type (plus "any").
+  type: z.preprocess(
+    (v) => (typeof v === "string" ? (TYPE_ALIASES[v.toLowerCase()] ?? v.toLowerCase()) : v),
+    z.enum(["any", "room", "studio", "apartment", "house", "pg", "other"]).nullable().optional(),
+  ),
   furn: z.enum(["any", "furnished", "semi", "unfurnished"]).nullable().optional(),
   max: z.number().nullable().optional(),
   sort: z.enum(["fresh", "price-asc", "price-desc", "distance"]).nullable().optional(),
@@ -17,10 +38,17 @@ const FilterSchema = z.object({
 export type ParsedFilters = z.infer<typeof FilterSchema>;
 
 export const parseNaturalSearch = createServerFn({ method: "POST" })
+  .middleware([requireSupabaseAuth])
   .inputValidator((raw: unknown) => InputSchema.parse(raw))
-  .handler(async ({ data }) => {
-    const key = process.env.LOVABLE_API_KEY;
-    if (!key) throw new Error("Missing LOVABLE_API_KEY");
+  .handler(async ({ data, context }) => {
+    const { chatCompletion, parseModelJson } = await import("@/lib/ai.server");
+    const { enforceRateLimit } = await import("@/lib/rate-limit");
+    await enforceRateLimit(
+      `ai:nl:${context.userId}`,
+      30,
+      600,
+      "Too many AI searches in a short time. Please wait a few minutes.",
+    );
 
     const system = `You convert a renter/buyer's natural-language request into a JSON filter for a housing search.
 Prices are in Indian Rupees. "15k" = 15000, "1.2 lakh" = 120000, "1 cr" = 10000000.
@@ -29,7 +57,8 @@ Only fill fields you are confident about. Use null for anything not specified.
 Field values:
 - mode: "rent" or "sale" (default null → keep current)
 - q: short landmark/neighborhood/campus keyword, e.g. "COEP", "Koregaon Park". Null if none.
-- type: "any" | "room" | "pg" | "flat" | "house"
+- type: "any" | "room" | "studio" | "apartment" | "house" | "pg" | "other"
+  ("flat"/"BHK" = "apartment", "1RK" = "studio", "PG"/"hostel" = "pg", "villa"/"bungalow" = "house")
 - furn: "any" | "furnished" | "semi" | "unfurnished"
 - max: numeric max price (rupees). For rent this is per month. Null if unspecified.
 - sort: "fresh" | "price-asc" | "price-desc" | "distance" (use "distance" if user mentions "near/close to <place>")
@@ -40,34 +69,25 @@ Return ONLY JSON, no prose.`;
 Return JSON matching:
 { "mode": ..., "q": ..., "type": ..., "furn": ..., "max": ..., "sort": ... }`;
 
-    const res = await fetch("https://ai.gateway.lovable.dev/v1/chat/completions", {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "Lovable-API-Key": key },
-      body: JSON.stringify({
-        model: "google/gemini-2.5-flash",
-        response_format: { type: "json_object" as const },
-        messages: [
-          { role: "system", content: system },
-          { role: "user", content: userText },
-        ],
-      }),
+    const raw = await chatCompletion({
+      json: true,
+      timeoutMs: 20_000,
+      messages: [
+        { role: "system", content: system },
+        { role: "user", content: userText },
+      ],
     });
-    if (res.status === 429) throw new Error("AI is busy — try again in a minute.");
-    if (res.status === 402) throw new Error("AI credits exhausted. Please add credits.");
-    if (!res.ok) throw new Error(`AI request failed: ${res.status}`);
+    const parsed: unknown = parseModelJson(raw);
 
-    const json = (await res.json()) as { choices?: Array<{ message?: { content?: string } }> };
-    const raw = json.choices?.[0]?.message?.content ?? "{}";
-    let parsed: unknown = {};
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
-      const stripped = raw.replace(/^```(?:json)?\s*/i, "").replace(/```\s*$/i, "");
-      try { parsed = JSON.parse(stripped); } catch { parsed = {}; }
+    // Validate field-by-field so one odd value doesn't throw away the rest.
+    const filters: ParsedFilters = {};
+    if (parsed && typeof parsed === "object") {
+      const obj = parsed as Record<string, unknown>;
+      for (const key of Object.keys(FilterSchema.shape) as Array<keyof typeof FilterSchema.shape>) {
+        const r = FilterSchema.shape[key].safeParse(obj[key]);
+        if (r.success && r.data !== undefined) (filters as Record<string, unknown>)[key] = r.data;
+      }
     }
-
-    const safe = FilterSchema.safeParse(parsed);
-    const filters: ParsedFilters = safe.success ? safe.data : {};
 
     // Build a patch of only defined non-null fields
     const patch: Record<string, string | number> = {};

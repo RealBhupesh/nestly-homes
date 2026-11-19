@@ -9,10 +9,15 @@
 // Additionally, you should also exclude this file from your linter and/or formatter to prevent it from being checked or modified.
 
 import { Route as rootRouteImport } from './routes/__root'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as SitemapDotxmlRouteImport } from './routes/sitemap[.]xml'
 import { Route as SearchRouteImport } from './routes/search'
+import { Route as ResetPasswordRouteImport } from './routes/reset-password'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as ContactRouteImport } from './routes/contact'
 import { Route as CompareRouteImport } from './routes/compare'
 import { Route as AuthRouteImport } from './routes/auth'
+import { Route as AboutRouteImport } from './routes/about'
 import { Route as AuthenticatedRouteRouteImport } from './routes/_authenticated/route'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ListingIdRouteImport } from './routes/listing.$id'
@@ -22,16 +27,19 @@ import { Route as AuthenticatedDashboardIndexRouteImport } from './routes/_authe
 import { Route as AuthenticatedAdminIndexRouteImport } from './routes/_authenticated/admin.index'
 import { Route as ApiPublicThumbRouteImport } from './routes/api/public/thumb'
 import { Route as ApiPublicListingsRouteImport } from './routes/api/public/listings'
+import { Route as ApiPublicGeocodeRouteImport } from './routes/api/public/geocode'
 import { Route as AuthenticatedDashboardVerifyRouteImport } from './routes/_authenticated/dashboard.verify'
 import { Route as AuthenticatedDashboardToursRouteImport } from './routes/_authenticated/dashboard.tours'
 import { Route as AuthenticatedDashboardSavedRouteImport } from './routes/_authenticated/dashboard.saved'
 import { Route as AuthenticatedDashboardNewRouteImport } from './routes/_authenticated/dashboard.new'
 import { Route as AuthenticatedDashboardInboxRouteImport } from './routes/_authenticated/dashboard.inbox'
+import { Route as AuthenticatedDashboardAccountRouteImport } from './routes/_authenticated/dashboard.account'
 import { Route as AuthenticatedAdminVerificationsRouteImport } from './routes/_authenticated/admin.verifications'
 import { Route as AuthenticatedAdminUsersRouteImport } from './routes/_authenticated/admin.users'
 import { Route as AuthenticatedAdminSettingsRouteImport } from './routes/_authenticated/admin.settings'
 import { Route as AuthenticatedAdminSearchesRouteImport } from './routes/_authenticated/admin.searches'
 import { Route as AuthenticatedAdminReviewsRouteImport } from './routes/_authenticated/admin.reviews'
+import { Route as AuthenticatedAdminReportsRouteImport } from './routes/_authenticated/admin.reports'
 import { Route as AuthenticatedAdminPhotosRouteImport } from './routes/_authenticated/admin.photos'
 import { Route as AuthenticatedAdminListingsRouteImport } from './routes/_authenticated/admin.listings'
 import { Route as AuthenticatedAdminAuditRouteImport } from './routes/_authenticated/admin.audit'
@@ -41,6 +49,11 @@ import { Route as ApiPublicHooksSavedSearchAlertsRouteImport } from './routes/ap
 import { Route as AuthenticatedDashboardIdEditRouteImport } from './routes/_authenticated/dashboard.$id.edit'
 import { Route as AuthenticatedAdminUsersUserIdRouteImport } from './routes/_authenticated/admin.users.$userId'
 
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const SitemapDotxmlRoute = SitemapDotxmlRouteImport.update({
   id: '/sitemap.xml',
   path: '/sitemap.xml',
@@ -51,6 +64,21 @@ const SearchRoute = SearchRouteImport.update({
   path: '/search',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ResetPasswordRoute = ResetPasswordRouteImport.update({
+  id: '/reset-password',
+  path: '/reset-password',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const CompareRoute = CompareRouteImport.update({
   id: '/compare',
   path: '/compare',
@@ -59,6 +87,11 @@ const CompareRoute = CompareRouteImport.update({
 const AuthRoute = AuthRouteImport.update({
   id: '/auth',
   path: '/auth',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AboutRoute = AboutRouteImport.update({
+  id: '/about',
+  path: '/about',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AuthenticatedRouteRoute = AuthenticatedRouteRouteImport.update({
@@ -106,6 +139,11 @@ const ApiPublicListingsRoute = ApiPublicListingsRouteImport.update({
   path: '/api/public/listings',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicGeocodeRoute = ApiPublicGeocodeRouteImport.update({
+  id: '/api/public/geocode',
+  path: '/api/public/geocode',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const AuthenticatedDashboardVerifyRoute =
   AuthenticatedDashboardVerifyRouteImport.update({
     id: '/verify',
@@ -136,6 +174,12 @@ const AuthenticatedDashboardInboxRoute =
     path: '/inbox',
     getParentRoute: () => AuthenticatedDashboardRoute,
   } as any)
+const AuthenticatedDashboardAccountRoute =
+  AuthenticatedDashboardAccountRouteImport.update({
+    id: '/account',
+    path: '/account',
+    getParentRoute: () => AuthenticatedDashboardRoute,
+  } as any)
 const AuthenticatedAdminVerificationsRoute =
   AuthenticatedAdminVerificationsRouteImport.update({
     id: '/verifications',
@@ -163,6 +207,12 @@ const AuthenticatedAdminReviewsRoute =
   AuthenticatedAdminReviewsRouteImport.update({
     id: '/reviews',
     path: '/reviews',
+    getParentRoute: () => AuthenticatedAdminRoute,
+  } as any)
+const AuthenticatedAdminReportsRoute =
+  AuthenticatedAdminReportsRouteImport.update({
+    id: '/reports',
+    path: '/reports',
     getParentRoute: () => AuthenticatedAdminRoute,
   } as any)
 const AuthenticatedAdminPhotosRoute =
@@ -214,10 +264,15 @@ const AuthenticatedAdminUsersUserIdRoute =
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/admin': typeof AuthenticatedAdminRouteWithChildren
   '/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/listing/$id': typeof ListingIdRoute
@@ -225,16 +280,19 @@ export interface FileRoutesByFullPath {
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/listings': typeof AuthenticatedAdminListingsRoute
   '/admin/photos': typeof AuthenticatedAdminPhotosRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/searches': typeof AuthenticatedAdminSearchesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
+  '/dashboard/account': typeof AuthenticatedDashboardAccountRoute
   '/dashboard/inbox': typeof AuthenticatedDashboardInboxRoute
   '/dashboard/new': typeof AuthenticatedDashboardNewRoute
   '/dashboard/saved': typeof AuthenticatedDashboardSavedRoute
   '/dashboard/tours': typeof AuthenticatedDashboardToursRoute
   '/dashboard/verify': typeof AuthenticatedDashboardVerifyRoute
+  '/api/public/geocode': typeof ApiPublicGeocodeRoute
   '/api/public/listings': typeof ApiPublicListingsRouteWithChildren
   '/api/public/thumb': typeof ApiPublicThumbRoute
   '/admin/': typeof AuthenticatedAdminIndexRoute
@@ -246,25 +304,33 @@ export interface FileRoutesByFullPath {
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/listing/$id': typeof ListingIdRoute
   '/admin/analytics': typeof AuthenticatedAdminAnalyticsRoute
   '/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/admin/listings': typeof AuthenticatedAdminListingsRoute
   '/admin/photos': typeof AuthenticatedAdminPhotosRoute
+  '/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/admin/searches': typeof AuthenticatedAdminSearchesRoute
   '/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
+  '/dashboard/account': typeof AuthenticatedDashboardAccountRoute
   '/dashboard/inbox': typeof AuthenticatedDashboardInboxRoute
   '/dashboard/new': typeof AuthenticatedDashboardNewRoute
   '/dashboard/saved': typeof AuthenticatedDashboardSavedRoute
   '/dashboard/tours': typeof AuthenticatedDashboardToursRoute
   '/dashboard/verify': typeof AuthenticatedDashboardVerifyRoute
+  '/api/public/geocode': typeof ApiPublicGeocodeRoute
   '/api/public/listings': typeof ApiPublicListingsRouteWithChildren
   '/api/public/thumb': typeof ApiPublicThumbRoute
   '/admin': typeof AuthenticatedAdminIndexRoute
@@ -278,10 +344,15 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/_authenticated': typeof AuthenticatedRouteRouteWithChildren
+  '/about': typeof AboutRoute
   '/auth': typeof AuthRoute
   '/compare': typeof CompareRoute
+  '/contact': typeof ContactRoute
+  '/privacy': typeof PrivacyRoute
+  '/reset-password': typeof ResetPasswordRoute
   '/search': typeof SearchRoute
   '/sitemap.xml': typeof SitemapDotxmlRoute
+  '/terms': typeof TermsRoute
   '/_authenticated/admin': typeof AuthenticatedAdminRouteWithChildren
   '/_authenticated/dashboard': typeof AuthenticatedDashboardRouteWithChildren
   '/listing/$id': typeof ListingIdRoute
@@ -289,16 +360,19 @@ export interface FileRoutesById {
   '/_authenticated/admin/audit': typeof AuthenticatedAdminAuditRoute
   '/_authenticated/admin/listings': typeof AuthenticatedAdminListingsRoute
   '/_authenticated/admin/photos': typeof AuthenticatedAdminPhotosRoute
+  '/_authenticated/admin/reports': typeof AuthenticatedAdminReportsRoute
   '/_authenticated/admin/reviews': typeof AuthenticatedAdminReviewsRoute
   '/_authenticated/admin/searches': typeof AuthenticatedAdminSearchesRoute
   '/_authenticated/admin/settings': typeof AuthenticatedAdminSettingsRoute
   '/_authenticated/admin/users': typeof AuthenticatedAdminUsersRouteWithChildren
   '/_authenticated/admin/verifications': typeof AuthenticatedAdminVerificationsRoute
+  '/_authenticated/dashboard/account': typeof AuthenticatedDashboardAccountRoute
   '/_authenticated/dashboard/inbox': typeof AuthenticatedDashboardInboxRoute
   '/_authenticated/dashboard/new': typeof AuthenticatedDashboardNewRoute
   '/_authenticated/dashboard/saved': typeof AuthenticatedDashboardSavedRoute
   '/_authenticated/dashboard/tours': typeof AuthenticatedDashboardToursRoute
   '/_authenticated/dashboard/verify': typeof AuthenticatedDashboardVerifyRoute
+  '/api/public/geocode': typeof ApiPublicGeocodeRoute
   '/api/public/listings': typeof ApiPublicListingsRouteWithChildren
   '/api/public/thumb': typeof ApiPublicThumbRoute
   '/_authenticated/admin/': typeof AuthenticatedAdminIndexRoute
@@ -312,10 +386,15 @@ export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
   fullPaths:
     | '/'
+    | '/about'
     | '/auth'
     | '/compare'
+    | '/contact'
+    | '/privacy'
+    | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/terms'
     | '/admin'
     | '/dashboard'
     | '/listing/$id'
@@ -323,16 +402,19 @@ export interface FileRouteTypes {
     | '/admin/audit'
     | '/admin/listings'
     | '/admin/photos'
+    | '/admin/reports'
     | '/admin/reviews'
     | '/admin/searches'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/verifications'
+    | '/dashboard/account'
     | '/dashboard/inbox'
     | '/dashboard/new'
     | '/dashboard/saved'
     | '/dashboard/tours'
     | '/dashboard/verify'
+    | '/api/public/geocode'
     | '/api/public/listings'
     | '/api/public/thumb'
     | '/admin/'
@@ -344,25 +426,33 @@ export interface FileRouteTypes {
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
+    | '/about'
     | '/auth'
     | '/compare'
+    | '/contact'
+    | '/privacy'
+    | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/terms'
     | '/listing/$id'
     | '/admin/analytics'
     | '/admin/audit'
     | '/admin/listings'
     | '/admin/photos'
+    | '/admin/reports'
     | '/admin/reviews'
     | '/admin/searches'
     | '/admin/settings'
     | '/admin/users'
     | '/admin/verifications'
+    | '/dashboard/account'
     | '/dashboard/inbox'
     | '/dashboard/new'
     | '/dashboard/saved'
     | '/dashboard/tours'
     | '/dashboard/verify'
+    | '/api/public/geocode'
     | '/api/public/listings'
     | '/api/public/thumb'
     | '/admin'
@@ -375,10 +465,15 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/_authenticated'
+    | '/about'
     | '/auth'
     | '/compare'
+    | '/contact'
+    | '/privacy'
+    | '/reset-password'
     | '/search'
     | '/sitemap.xml'
+    | '/terms'
     | '/_authenticated/admin'
     | '/_authenticated/dashboard'
     | '/listing/$id'
@@ -386,16 +481,19 @@ export interface FileRouteTypes {
     | '/_authenticated/admin/audit'
     | '/_authenticated/admin/listings'
     | '/_authenticated/admin/photos'
+    | '/_authenticated/admin/reports'
     | '/_authenticated/admin/reviews'
     | '/_authenticated/admin/searches'
     | '/_authenticated/admin/settings'
     | '/_authenticated/admin/users'
     | '/_authenticated/admin/verifications'
+    | '/_authenticated/dashboard/account'
     | '/_authenticated/dashboard/inbox'
     | '/_authenticated/dashboard/new'
     | '/_authenticated/dashboard/saved'
     | '/_authenticated/dashboard/tours'
     | '/_authenticated/dashboard/verify'
+    | '/api/public/geocode'
     | '/api/public/listings'
     | '/api/public/thumb'
     | '/_authenticated/admin/'
@@ -409,11 +507,17 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AuthenticatedRouteRoute: typeof AuthenticatedRouteRouteWithChildren
+  AboutRoute: typeof AboutRoute
   AuthRoute: typeof AuthRoute
   CompareRoute: typeof CompareRoute
+  ContactRoute: typeof ContactRoute
+  PrivacyRoute: typeof PrivacyRoute
+  ResetPasswordRoute: typeof ResetPasswordRoute
   SearchRoute: typeof SearchRoute
   SitemapDotxmlRoute: typeof SitemapDotxmlRoute
+  TermsRoute: typeof TermsRoute
   ListingIdRoute: typeof ListingIdRoute
+  ApiPublicGeocodeRoute: typeof ApiPublicGeocodeRoute
   ApiPublicListingsRoute: typeof ApiPublicListingsRouteWithChildren
   ApiPublicThumbRoute: typeof ApiPublicThumbRoute
   ApiPublicHooksSavedSearchAlertsRoute: typeof ApiPublicHooksSavedSearchAlertsRoute
@@ -421,6 +525,13 @@ export interface RootRouteChildren {
 
 declare module '@tanstack/react-router' {
   interface FileRoutesByPath {
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/sitemap.xml': {
       id: '/sitemap.xml'
       path: '/sitemap.xml'
@@ -435,6 +546,27 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof SearchRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/reset-password': {
+      id: '/reset-password'
+      path: '/reset-password'
+      fullPath: '/reset-password'
+      preLoaderRoute: typeof ResetPasswordRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/compare': {
       id: '/compare'
       path: '/compare'
@@ -447,6 +579,13 @@ declare module '@tanstack/react-router' {
       path: '/auth'
       fullPath: '/auth'
       preLoaderRoute: typeof AuthRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/about': {
+      id: '/about'
+      path: '/about'
+      fullPath: '/about'
+      preLoaderRoute: typeof AboutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/_authenticated': {
@@ -512,6 +651,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicListingsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/geocode': {
+      id: '/api/public/geocode'
+      path: '/api/public/geocode'
+      fullPath: '/api/public/geocode'
+      preLoaderRoute: typeof ApiPublicGeocodeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/_authenticated/dashboard/verify': {
       id: '/_authenticated/dashboard/verify'
       path: '/verify'
@@ -547,6 +693,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof AuthenticatedDashboardInboxRouteImport
       parentRoute: typeof AuthenticatedDashboardRoute
     }
+    '/_authenticated/dashboard/account': {
+      id: '/_authenticated/dashboard/account'
+      path: '/account'
+      fullPath: '/dashboard/account'
+      preLoaderRoute: typeof AuthenticatedDashboardAccountRouteImport
+      parentRoute: typeof AuthenticatedDashboardRoute
+    }
     '/_authenticated/admin/verifications': {
       id: '/_authenticated/admin/verifications'
       path: '/verifications'
@@ -580,6 +733,13 @@ declare module '@tanstack/react-router' {
       path: '/reviews'
       fullPath: '/admin/reviews'
       preLoaderRoute: typeof AuthenticatedAdminReviewsRouteImport
+      parentRoute: typeof AuthenticatedAdminRoute
+    }
+    '/_authenticated/admin/reports': {
+      id: '/_authenticated/admin/reports'
+      path: '/reports'
+      fullPath: '/admin/reports'
+      preLoaderRoute: typeof AuthenticatedAdminReportsRouteImport
       parentRoute: typeof AuthenticatedAdminRoute
     }
     '/_authenticated/admin/photos': {
@@ -660,6 +820,7 @@ interface AuthenticatedAdminRouteChildren {
   AuthenticatedAdminAuditRoute: typeof AuthenticatedAdminAuditRoute
   AuthenticatedAdminListingsRoute: typeof AuthenticatedAdminListingsRoute
   AuthenticatedAdminPhotosRoute: typeof AuthenticatedAdminPhotosRoute
+  AuthenticatedAdminReportsRoute: typeof AuthenticatedAdminReportsRoute
   AuthenticatedAdminReviewsRoute: typeof AuthenticatedAdminReviewsRoute
   AuthenticatedAdminSearchesRoute: typeof AuthenticatedAdminSearchesRoute
   AuthenticatedAdminSettingsRoute: typeof AuthenticatedAdminSettingsRoute
@@ -673,6 +834,7 @@ const AuthenticatedAdminRouteChildren: AuthenticatedAdminRouteChildren = {
   AuthenticatedAdminAuditRoute: AuthenticatedAdminAuditRoute,
   AuthenticatedAdminListingsRoute: AuthenticatedAdminListingsRoute,
   AuthenticatedAdminPhotosRoute: AuthenticatedAdminPhotosRoute,
+  AuthenticatedAdminReportsRoute: AuthenticatedAdminReportsRoute,
   AuthenticatedAdminReviewsRoute: AuthenticatedAdminReviewsRoute,
   AuthenticatedAdminSearchesRoute: AuthenticatedAdminSearchesRoute,
   AuthenticatedAdminSettingsRoute: AuthenticatedAdminSettingsRoute,
@@ -685,6 +847,7 @@ const AuthenticatedAdminRouteWithChildren =
   AuthenticatedAdminRoute._addFileChildren(AuthenticatedAdminRouteChildren)
 
 interface AuthenticatedDashboardRouteChildren {
+  AuthenticatedDashboardAccountRoute: typeof AuthenticatedDashboardAccountRoute
   AuthenticatedDashboardInboxRoute: typeof AuthenticatedDashboardInboxRoute
   AuthenticatedDashboardNewRoute: typeof AuthenticatedDashboardNewRoute
   AuthenticatedDashboardSavedRoute: typeof AuthenticatedDashboardSavedRoute
@@ -696,6 +859,7 @@ interface AuthenticatedDashboardRouteChildren {
 
 const AuthenticatedDashboardRouteChildren: AuthenticatedDashboardRouteChildren =
   {
+    AuthenticatedDashboardAccountRoute: AuthenticatedDashboardAccountRoute,
     AuthenticatedDashboardInboxRoute: AuthenticatedDashboardInboxRoute,
     AuthenticatedDashboardNewRoute: AuthenticatedDashboardNewRoute,
     AuthenticatedDashboardSavedRoute: AuthenticatedDashboardSavedRoute,
@@ -737,11 +901,17 @@ const ApiPublicListingsRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AuthenticatedRouteRoute: AuthenticatedRouteRouteWithChildren,
+  AboutRoute: AboutRoute,
   AuthRoute: AuthRoute,
   CompareRoute: CompareRoute,
+  ContactRoute: ContactRoute,
+  PrivacyRoute: PrivacyRoute,
+  ResetPasswordRoute: ResetPasswordRoute,
   SearchRoute: SearchRoute,
   SitemapDotxmlRoute: SitemapDotxmlRoute,
+  TermsRoute: TermsRoute,
   ListingIdRoute: ListingIdRoute,
+  ApiPublicGeocodeRoute: ApiPublicGeocodeRoute,
   ApiPublicListingsRoute: ApiPublicListingsRouteWithChildren,
   ApiPublicThumbRoute: ApiPublicThumbRoute,
   ApiPublicHooksSavedSearchAlertsRoute: ApiPublicHooksSavedSearchAlertsRoute,

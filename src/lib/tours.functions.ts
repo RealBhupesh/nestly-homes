@@ -109,7 +109,8 @@ export const listSlotsForListing = createServerFn({ method: "GET" })
     listingId: z.string().min(1).max(200).parse(input.listingId),
   }))
   .handler(async ({ data, context }) => {
-    if (!uuid.safeParse(data.listingId).success) return [] as Array<TourSlotRow & { taken: number }>;
+    if (!uuid.safeParse(data.listingId).success)
+      return [] as Array<TourSlotRow & { taken: number }>;
     const { data: slots, error } = await context.supabase
       .from("tour_slots")
       .select(SLOT_COLS)
@@ -137,6 +138,8 @@ export const listSlotsForListing = createServerFn({ method: "GET" })
 
 /* ---------------- Bookings ---------------- */
 
+// `ownerId` and `listingTitle` are accepted for backwards compatibility but
+// ignored: the owner and title are derived server-side from the listing/slot.
 const bookSchema = z.object({
   listingId: z.string().min(1).max(200),
   listingTitle: z.string().max(300).optional(),
@@ -155,25 +158,48 @@ export const bookTour = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     if (!data.slotId && !data.proposedAt) throw new Error("Pick a time slot or propose a date.");
 
-    let ownerId = data.ownerId ?? null;
+    const { enforceRateLimit } = await import("@/lib/rate-limit");
+    await enforceRateLimit(
+      `tour:${context.userId}`,
+      10,
+      3600,
+      "Too many tour requests. Please try again later.",
+    );
+
+    const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+    const notify = await import("@/lib/notify.server");
+
+    let listingId = data.listingId;
+    let slotStartsAt: string | null = null;
     if (data.slotId) {
-      const { data: slot } = await context.supabase
+      const { data: slot } = await supabaseAdmin
         .from("tour_slots")
-        .select("owner_id, listing_id")
+        .select("owner_id, listing_id, starts_at")
         .eq("id", data.slotId)
         .maybeSingle();
       if (!slot) throw new Error("That slot is no longer available.");
-      ownerId = slot.owner_id;
+      if (slot.listing_id !== data.listingId)
+        throw new Error("That slot belongs to a different listing.");
+      listingId = slot.listing_id;
+      slotStartsAt = slot.starts_at;
     }
+
+    const listing = await notify.getDbListing(listingId);
+    if (!listing || listing.status !== "published") {
+      throw new Error("Tours can only be booked for live listings.");
+    }
+    if (listing.owner_id === context.userId)
+      throw new Error("You can't book a tour of your own listing.");
 
     const { data: row, error } = await context.supabase
       .from("tour_bookings")
       .insert({
         slot_id: data.slotId ?? null,
-        listing_id: data.listingId,
-        listing_title: data.listingTitle ?? null,
-        owner_id: ownerId,
+        listing_id: listing.id,
+        listing_title: listing.title,
+        owner_id: listing.owner_id,
         seeker_id: context.userId,
+        status: "requested",
         proposed_at: data.proposedAt ?? null,
         party_size: data.partySize,
         note: data.note ?? null,
@@ -183,7 +209,17 @@ export const bookTour = createServerFn({ method: "POST" })
       .select(BOOKING_COLS)
       .single();
     if (error) throw new Error(error.message);
-    return row as TourBookingRow;
+    const booking = row as TourBookingRow;
+
+    const info = { ...booking, slot_starts_at: slotStartsAt };
+    await notify.postBookingMessage({
+      listingId: listing.id,
+      seekerId: context.userId,
+      senderId: context.userId,
+      body: notify.tourMessageBody("requested", info),
+    });
+    await notify.notifyTourEvent({ event: "requested", booking: info, actorId: context.userId });
+    return booking;
   });
 
 export const listMyBookings = createServerFn({ method: "GET" })
@@ -225,19 +261,44 @@ export const setBookingStatus = createServerFn({ method: "POST" })
   .handler(async ({ data, context }) => {
     const { data: booking } = await context.supabase
       .from("tour_bookings")
-      .select("owner_id, seeker_id")
+      .select(BOOKING_COLS)
       .eq("id", data.bookingId)
       .maybeSingle();
     if (!booking) throw new Error("Booking not found.");
-    const isOwner = booking.owner_id === context.userId;
-    const isSeeker = booking.seeker_id === context.userId;
+    const b = booking as TourBookingRow;
+    const isOwner = b.owner_id !== null && b.owner_id === context.userId;
+    const isSeeker = b.seeker_id === context.userId;
     if (!isOwner && !isSeeker) throw new Error("Not allowed.");
-    // Seekers may only cancel; owners can confirm/decline/complete.
+    if (data.status === "requested") throw new Error("A booking can't be moved back to requested.");
+    // Seekers may only cancel; only the owner can confirm/decline/complete.
     if (!isOwner && data.status !== "cancelled") throw new Error("Only the owner can change this.");
+    if (b.status === data.status) return { ok: true };
+
     const { error } = await context.supabase
       .from("tour_bookings")
       .update({ status: data.status })
       .eq("id", data.bookingId);
     if (error) throw new Error(error.message);
+
+    if (data.status === "confirmed" || data.status === "declined" || data.status === "cancelled") {
+      const notify = await import("@/lib/notify.server");
+      let slotStartsAt: string | null = null;
+      if (b.slot_id) {
+        const { data: slot } = await context.supabase
+          .from("tour_slots")
+          .select("starts_at")
+          .eq("id", b.slot_id)
+          .maybeSingle();
+        slotStartsAt = slot?.starts_at ?? null;
+      }
+      const info = { ...b, status: data.status, slot_starts_at: slotStartsAt };
+      await notify.postBookingMessage({
+        listingId: b.listing_id,
+        seekerId: b.seeker_id,
+        senderId: context.userId,
+        body: notify.tourMessageBody(data.status, info),
+      });
+      await notify.notifyTourEvent({ event: data.status, booking: info, actorId: context.userId });
+    }
     return { ok: true };
   });

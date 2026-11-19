@@ -22,10 +22,19 @@ function EditListing() {
     (async () => {
       const [{ data: listing, error: e1 }, { data: photos, error: e2 }] = await Promise.all([
         supabase.from("listings").select("*").eq("id", id).maybeSingle(),
-        supabase.from("listing_photos").select("id, url, storage_path, position").eq("listing_id", id).order("position"),
+        supabase
+          .from("listing_photos")
+          .select("id, url, storage_path, position")
+          .eq("listing_id", id)
+          .order("position"),
       ]);
       if (e1 || e2 || !listing) {
-        setState({ initial: null, photos: [], loading: false, error: e1?.message ?? e2?.message ?? "Not found" });
+        setState({
+          initial: null,
+          photos: [],
+          loading: false,
+          error: e1?.message ?? e2?.message ?? "Not found",
+        });
         return;
       }
       setState({
@@ -41,7 +50,12 @@ function EditListing() {
     return (
       <div className="rounded-xl border border-border/70 p-14 text-center">
         <p className="text-lg font-medium text-ink">Listing not found</p>
-        <Link to="/dashboard" className="mt-3 inline-block text-[13px] text-ink/70 underline underline-offset-4 hover:text-ink">Back to listings</Link>
+        <Link
+          to="/dashboard"
+          className="mt-3 inline-block text-[13px] text-ink/70 underline underline-offset-4 hover:text-ink"
+        >
+          Back to listings
+        </Link>
       </div>
     );
   }
@@ -51,12 +65,22 @@ function EditListing() {
       <div className="flex items-end justify-between border-b border-border/70 pb-8">
         <div>
           <p className="text-[11px] tracking-wide text-ink/50">
-            <Link to="/dashboard" className="hover:text-ink">Listings</Link> / Edit
+            <Link to="/dashboard" className="hover:text-ink">
+              Listings
+            </Link>{" "}
+            / Edit
           </p>
-          <h1 className="mt-2 text-3xl font-medium tracking-tight text-ink sm:text-4xl">{state.initial.title || "Untitled"}</h1>
+          <h1 className="mt-2 text-3xl font-medium tracking-tight text-ink sm:text-4xl">
+            {state.initial.title || "Untitled"}
+          </h1>
         </div>
       </div>
-      <ListingForm userId={user.id} listingId={id} initial={state.initial} initialPhotos={state.photos} />
+      <ListingForm
+        userId={user.id}
+        listingId={id}
+        initial={state.initial}
+        initialPhotos={state.photos}
+      />
     </div>
   );
 }

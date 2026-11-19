@@ -56,9 +56,18 @@ export const getAdminOverview = createServerFn({ method: "GET" })
 
     const [listingsAll, published, drafts, archived, reviews, photos, users] = await Promise.all([
       supabaseAdmin.from("listings").select("*", { count: "exact", head: true }),
-      supabaseAdmin.from("listings").select("*", { count: "exact", head: true }).eq("status", "published"),
-      supabaseAdmin.from("listings").select("*", { count: "exact", head: true }).eq("status", "draft"),
-      supabaseAdmin.from("listings").select("*", { count: "exact", head: true }).eq("status", "archived"),
+      supabaseAdmin
+        .from("listings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "published"),
+      supabaseAdmin
+        .from("listings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "draft"),
+      supabaseAdmin
+        .from("listings")
+        .select("*", { count: "exact", head: true })
+        .eq("status", "archived"),
       supabaseAdmin.from("listing_reviews").select("*", { count: "exact", head: true }),
       supabaseAdmin.from("listing_photos").select("*", { count: "exact", head: true }),
       supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 1 }),
@@ -70,10 +79,7 @@ export const getAdminOverview = createServerFn({ method: "GET" })
       .order("updated_at", { ascending: false })
       .limit(6);
 
-    const { data: byCity } = await supabaseAdmin
-      .from("listings")
-      .select("city")
-      .limit(1000);
+    const { data: byCity } = await supabaseAdmin.from("listings").select("city").limit(1000);
     const cityCounts: Record<string, number> = {};
     for (const r of byCity ?? []) {
       const c = (r as any).city ?? "Unknown";
@@ -114,7 +120,9 @@ export const listAllListings = createServerFn({ method: "GET" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     let q = supabaseAdmin
       .from("listings")
-      .select("id, title, status, mode, city, price_amount, cover_photo_url, updated_at, created_at, owner_id, is_featured, property_type, bedrooms")
+      .select(
+        "id, title, status, mode, city, price_amount, cover_photo_url, updated_at, created_at, owner_id, is_featured, property_type, bedrooms",
+      )
       .order("updated_at", { ascending: false })
       .limit(200);
     if (data.status !== "all") q = q.eq("status", data.status);
@@ -142,7 +150,9 @@ export const setListingStatus = createServerFn({ method: "POST" })
       .update({ status: data.status })
       .eq("id", data.id);
     if (error) throw new Error(error.message);
-    await logAudit(supabaseAdmin, context.userId, "listing.status", "listing", data.id, { status: data.status });
+    await logAudit(supabaseAdmin, context.userId, "listing.status", "listing", data.id, {
+      status: data.status,
+    });
     return { ok: true };
   });
 
@@ -177,16 +187,15 @@ export const bulkSetListingStatus = createServerFn({ method: "POST" })
       .in("id", data.ids);
     if (error) throw new Error(error.message);
     await logAudit(supabaseAdmin, context.userId, "listing.bulk_status", "listing", null, {
-      status: data.status, count: data.ids.length,
+      status: data.status,
+      count: data.ids.length,
     });
     return { ok: true, count: data.ids.length };
   });
 
 export const bulkDeleteListings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i),
-  )
+  .inputValidator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -200,9 +209,7 @@ export const bulkDeleteListings = createServerFn({ method: "POST" })
 
 export const setListingFeatured = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({ id: z.string().uuid(), featured: z.boolean() }).parse(i),
-  )
+  .inputValidator((i) => z.object({ id: z.string().uuid(), featured: z.boolean() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -220,10 +227,12 @@ export const setListingFeatured = createServerFn({ method: "POST" })
 export const bulkSetListingFeatured = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({
-      ids: z.array(z.string().uuid()).min(1).max(500),
-      featured: z.boolean(),
-    }).parse(i),
+    z
+      .object({
+        ids: z.array(z.string().uuid()).min(1).max(500),
+        featured: z.boolean(),
+      })
+      .parse(i),
   )
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
@@ -234,7 +243,8 @@ export const bulkSetListingFeatured = createServerFn({ method: "POST" })
       .in("id", data.ids);
     if (error) throw new Error(error.message);
     await logAudit(supabaseAdmin, context.userId, "listing.bulk_featured", "listing", null, {
-      featured: data.featured, count: data.ids.length,
+      featured: data.featured,
+      count: data.ids.length,
     });
     return { ok: true, count: data.ids.length };
   });
@@ -317,7 +327,9 @@ export const setUserRole = createServerFn({ method: "POST" })
         .from("user_roles")
         .insert({ user_id: data.userId, role: data.role });
       if (error && !String(error.message).includes("duplicate")) throw new Error(error.message);
-      await logAudit(supabaseAdmin, context.userId, "role.grant", "user", data.userId, { role: data.role });
+      await logAudit(supabaseAdmin, context.userId, "role.grant", "user", data.userId, {
+        role: data.role,
+      });
     } else {
       const { error } = await supabaseAdmin
         .from("user_roles")
@@ -325,7 +337,9 @@ export const setUserRole = createServerFn({ method: "POST" })
         .eq("user_id", data.userId)
         .eq("role", data.role);
       if (error) throw new Error(error.message);
-      await logAudit(supabaseAdmin, context.userId, "role.revoke", "user", data.userId, { role: data.role });
+      await logAudit(supabaseAdmin, context.userId, "role.revoke", "user", data.userId, {
+        role: data.role,
+      });
     }
     return { ok: true };
   });
@@ -360,7 +374,9 @@ export const getAdminTimeseries = createServerFn({ method: "GET" })
     const lMap = bucket(listings.data ?? []);
     const rMap = bucket(reviews.data ?? []);
     const uMap = bucket(
-      (users.data?.users ?? []).filter((u: any) => u.created_at >= sinceIso).map((u: any) => ({ created_at: u.created_at })),
+      (users.data?.users ?? [])
+        .filter((u: any) => u.created_at >= sinceIso)
+        .map((u: any) => ({ created_at: u.created_at })),
     );
 
     const series: Array<{ date: string; listings: number; reviews: number; users: number }> = [];
@@ -387,7 +403,10 @@ export const getAdminAnalytics = createServerFn({ method: "GET" })
       .select("mode, property_type, city, price_amount, bedrooms, owner_id, status")
       .limit(5000);
 
-    const byMode: Record<string, { count: number; avg: number; sum: number; min: number; max: number }> = {};
+    const byMode: Record<
+      string,
+      { count: number; avg: number; sum: number; min: number; max: number }
+    > = {};
     const byType: Record<string, number> = {};
     const byBedrooms: Record<string, number> = {};
     const ownerCounts: Record<string, number> = {};
@@ -422,7 +441,11 @@ export const getAdminAnalytics = createServerFn({ method: "GET" })
       const users = await supabaseAdmin.auth.admin.listUsers({ page: 1, perPage: 200 });
       const emailById = new Map<string, string>();
       for (const u of users.data?.users ?? []) emailById.set(u.id, u.email ?? "");
-      topOwners = topOwnerIds.map(([id, count]) => ({ id, email: emailById.get(id) ?? "—", count }));
+      topOwners = topOwnerIds.map(([id, count]) => ({
+        id,
+        email: emailById.get(id) ?? "—",
+        count,
+      }));
     }
 
     return {
@@ -505,9 +528,7 @@ export const listAllSavedSearches = createServerFn({ method: "GET" })
 
 export const bulkDeleteReviews = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i),
-  )
+  .inputValidator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -571,9 +592,7 @@ export const getUserDetail = createServerFn({ method: "GET" })
 
 export const setUserBan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
-    z.object({ userId: z.string().uuid(), ban: z.boolean() }).parse(i),
-  )
+  .inputValidator((i) => z.object({ userId: z.string().uuid(), ban: z.boolean() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     if (data.userId === context.userId) throw new Error("You cannot ban yourself.");
@@ -582,7 +601,13 @@ export const setUserBan = createServerFn({ method: "POST" })
       ban_duration: data.ban ? "876000h" : "none",
     } as any);
     if (error) throw new Error(error.message);
-    await logAudit(supabaseAdmin, context.userId, data.ban ? "user.ban" : "user.unban", "user", data.userId);
+    await logAudit(
+      supabaseAdmin,
+      context.userId,
+      data.ban ? "user.ban" : "user.unban",
+      "user",
+      data.userId,
+    );
     return { ok: true };
   });
 
@@ -634,7 +659,12 @@ export const deleteUserNote = createServerFn({ method: "POST" })
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
   .inputValidator((i) =>
-    z.object({ q: z.string().optional().default(""), limit: z.number().int().min(10).max(500).default(200) }).parse(i),
+    z
+      .object({
+        q: z.string().optional().default(""),
+        limit: z.number().int().min(10).max(500).default(200),
+      })
+      .parse(i),
   )
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
@@ -666,10 +696,7 @@ export const listFeatureFlags = createServerFn({ method: "GET" })
   .handler(async ({ context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
-    const { data, error } = await supabaseAdmin
-      .from("feature_flags")
-      .select("*")
-      .order("key");
+    const { data, error } = await supabaseAdmin.from("feature_flags").select("*").order("key");
     if (error) throw new Error(error.message);
     return data ?? [];
   });
@@ -684,9 +711,15 @@ export const setFeatureFlag = createServerFn({ method: "POST" })
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
     const { error } = await supabaseAdmin
       .from("feature_flags")
-      .update({ enabled: data.enabled, updated_by: context.userId, updated_at: new Date().toISOString() })
+      .update({
+        enabled: data.enabled,
+        updated_by: context.userId,
+        updated_at: new Date().toISOString(),
+      })
       .eq("key", data.key);
     if (error) throw new Error(error.message);
-    await logAudit(supabaseAdmin, context.userId, "flag.set", "flag", data.key, { enabled: data.enabled });
+    await logAudit(supabaseAdmin, context.userId, "flag.set", "flag", data.key, {
+      enabled: data.enabled,
+    });
     return { ok: true };
   });

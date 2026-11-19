@@ -11,13 +11,25 @@ type Props = {
   onSelect?: (id: string) => void;
   /** Scroll parent element ref. Omit to virtualize against the window. */
   scrollRef?: React.RefObject<HTMLElement | null>;
+  /** Optional per-listing distance (km) to show on cards, e.g. to a searched place. */
+  distances?: Map<string, number> | null;
+  distanceLabel?: string;
 };
 
 /**
  * Window-virtualized responsive grid. Renders only the rows in view,
  * so scrolling stays smooth even with hundreds of cards.
  */
-export function VirtualListingGrid({ listings, hoveredId, onHover, selectedId, onSelect, scrollRef }: Props) {
+export function VirtualListingGrid({
+  listings,
+  hoveredId,
+  onHover,
+  selectedId,
+  onSelect,
+  scrollRef,
+  distances,
+  distanceLabel,
+}: Props) {
   const parentRef = useRef<HTMLDivElement | null>(null);
   const [cols, setCols] = useState(2);
 
@@ -60,10 +72,7 @@ export function VirtualListingGrid({ listings, hoveredId, onHover, selectedId, o
 
   return (
     <div ref={parentRef} className="relative w-full">
-      <div
-        style={{ height: `${rowVirtualizer.getTotalSize()}px` }}
-        className="relative w-full"
-      >
+      <div style={{ height: `${rowVirtualizer.getTotalSize()}px` }} className="relative w-full">
         {rowVirtualizer.getVirtualItems().map((virtualRow) => {
           const start = virtualRow.index * cols;
           const rowItems = listings.slice(start, start + cols);
@@ -94,7 +103,11 @@ export function VirtualListingGrid({ listings, hoveredId, onHover, selectedId, o
                         : ""
                   }`}
                 >
-                  <ListingCard listing={l} />
+                  <ListingCard
+                    listing={l}
+                    distanceKm={distances?.get(l.id) ?? null}
+                    distanceLabel={distanceLabel}
+                  />
                 </div>
               ))}
             </div>

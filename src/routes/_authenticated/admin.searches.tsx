@@ -6,7 +6,9 @@ import { toCSV, downloadCSV } from "@/lib/csv";
 import { Download, Search, X } from "lucide-react";
 import { useDebouncedValue } from "@/hooks/use-debounced-value";
 
-export const Route = createFileRoute("/_authenticated/admin/searches")({ component: AdminSearches });
+export const Route = createFileRoute("/_authenticated/admin/searches")({
+  component: AdminSearches,
+});
 
 type Row = Awaited<ReturnType<typeof listAllSavedSearches>>[number];
 
@@ -16,17 +18,20 @@ function AdminSearches() {
   const debouncedQ = useDebouncedValue(q, 200);
 
   useEffect(() => {
-    listAllSavedSearches().then(setRows).catch((e) => toast.error(e.message));
+    listAllSavedSearches()
+      .then(setRows)
+      .catch((e) => toast.error(e.message));
   }, []);
 
   const filtered = useMemo(() => {
     if (!rows) return null;
     const t = debouncedQ.trim().toLowerCase();
     if (!t) return rows;
-    return rows.filter((r) =>
-      r.name.toLowerCase().includes(t) ||
-      r.email.toLowerCase().includes(t) ||
-      JSON.stringify(r.params).toLowerCase().includes(t),
+    return rows.filter(
+      (r) =>
+        r.name.toLowerCase().includes(t) ||
+        r.email.toLowerCase().includes(t) ||
+        JSON.stringify(r.params).toLowerCase().includes(t),
     );
   }, [rows, debouncedQ]);
 
@@ -95,23 +100,42 @@ function AdminSearches() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/70">
-            {rows === null && Array.from({ length: 6 }).map((_, i) => (
-              <tr key={`sk-${i}`}>
-                <td className="px-4 py-3"><div className="h-3.5 w-40 animate-pulse rounded bg-muted" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-48 animate-pulse rounded bg-muted/70" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-64 animate-pulse rounded bg-muted/70" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-24 animate-pulse rounded bg-muted/70" /></td>
+            {rows === null &&
+              Array.from({ length: 6 }).map((_, i) => (
+                <tr key={`sk-${i}`}>
+                  <td className="px-4 py-3">
+                    <div className="h-3.5 w-40 animate-pulse rounded bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-3 w-48 animate-pulse rounded bg-muted/70" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-3 w-64 animate-pulse rounded bg-muted/70" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-3 w-24 animate-pulse rounded bg-muted/70" />
+                  </td>
+                </tr>
+              ))}
+            {filtered?.length === 0 && (
+              <tr>
+                <td colSpan={4} className="px-4 py-8 text-center text-ink/50">
+                  No saved searches.
+                </td>
               </tr>
-            ))}
-            {filtered?.length === 0 && <tr><td colSpan={4} className="px-4 py-8 text-center text-ink/50">No saved searches.</td></tr>}
+            )}
             {filtered?.map((r) => (
               <tr key={r.id}>
                 <td className="px-4 py-3 font-medium text-ink">{r.name}</td>
                 <td className="px-4 py-3 text-ink/70">{r.email}</td>
                 <td className="px-4 py-3 text-ink/60">
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">{JSON.stringify(r.params)}</code>
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                    {JSON.stringify(r.params)}
+                  </code>
                 </td>
-                <td className="px-4 py-3 text-ink/60">{new Date(r.created_at).toLocaleDateString()}</td>
+                <td className="px-4 py-3 text-ink/60">
+                  {new Date(r.created_at).toLocaleDateString()}
+                </td>
               </tr>
             ))}
           </tbody>

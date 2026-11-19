@@ -1,7 +1,18 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { getAdminAnalytics } from "@/lib/admin.functions";
-import { BarChart, Bar, PieChart, Pie, Cell, ResponsiveContainer, Tooltip, XAxis, YAxis, Legend as RLegend } from "recharts";
+import {
+  BarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+  Legend as RLegend,
+} from "recharts";
 import { useRealtimeRefresh } from "@/hooks/use-realtime-refresh";
 import { LiveIndicator } from "@/components/nestly/LiveIndicator";
 
@@ -19,10 +30,15 @@ function AdminAnalytics() {
   const [lastUpdated, setLastUpdated] = useState<Date | null>(null);
   const load = () => {
     getAdminAnalytics()
-      .then((r) => { setD(r); setLastUpdated(new Date()); })
+      .then((r) => {
+        setD(r);
+        setLastUpdated(new Date());
+      })
       .catch((e) => setErr(e.message));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
   useRealtimeRefresh(["listings"], load, { channelName: "admin-analytics" });
   if (err) return <p className="text-sm text-red-600">{err}</p>;
   if (!d) return <p className="text-sm text-ink/50">Loading…</p>;
@@ -32,7 +48,9 @@ function AdminAnalytics() {
       <header className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.2em] text-ink/45">Insights</p>
-          <h1 className="mt-1 text-2xl font-medium tracking-tight text-ink sm:text-3xl">Analytics</h1>
+          <h1 className="mt-1 text-2xl font-medium tracking-tight text-ink sm:text-3xl">
+            Analytics
+          </h1>
         </div>
         <div className="flex flex-wrap items-center gap-2 text-[12px]">
           <LiveIndicator lastUpdated={lastUpdated} />
@@ -68,8 +86,17 @@ function AdminAnalytics() {
           <div className="mt-4 h-64">
             <ResponsiveContainer>
               <PieChart>
-                <Pie data={d.byType} dataKey="count" nameKey="type" innerRadius={50} outerRadius={90} paddingAngle={2}>
-                  {d.byType.map((_, i) => <Cell key={i} fill={COLORS[i % COLORS.length]} />)}
+                <Pie
+                  data={d.byType}
+                  dataKey="count"
+                  nameKey="type"
+                  innerRadius={50}
+                  outerRadius={90}
+                  paddingAngle={2}
+                >
+                  {d.byType.map((_, i) => (
+                    <Cell key={i} fill={COLORS[i % COLORS.length]} />
+                  ))}
                 </Pie>
                 <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8 }} />
                 <RLegend wrapperStyle={{ fontSize: 11 }} />
@@ -98,7 +125,9 @@ function AdminAnalytics() {
             {d.topOwners.map((o) => (
               <li key={o.id} className="flex items-center justify-between py-2.5">
                 <span className="truncate text-ink">{o.email}</span>
-                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-ink/70">{o.count} listings</span>
+                <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-ink/70">
+                  {o.count} listings
+                </span>
               </li>
             ))}
             {d.topOwners.length === 0 && <li className="py-2 text-ink/50">No owners.</li>}

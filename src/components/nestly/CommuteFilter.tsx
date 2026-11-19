@@ -81,7 +81,9 @@ export function CommuteFilter({
                   }`}
                 >
                   <span className="truncate">{d.label}</span>
-                  <span className={`ml-2 shrink-0 text-[11px] ${destKey === d.key ? "text-cream/70" : "text-ink/40"}`}>
+                  <span
+                    className={`ml-2 shrink-0 text-[11px] ${destKey === d.key ? "text-cream/70" : "text-ink/40"}`}
+                  >
                     {d.hint}
                   </span>
                 </button>
@@ -102,7 +104,9 @@ export function CommuteFilter({
                   activeMode === m ? "bg-card text-ink shadow-tactile" : "text-ink/60"
                 }`}
               >
-                <span className="mr-1" aria-hidden>{MODE_ICON[m]}</span>
+                <span className="mr-1" aria-hidden>
+                  {MODE_ICON[m]}
+                </span>
                 {MODE_LABEL[m]}
               </button>
             ))}

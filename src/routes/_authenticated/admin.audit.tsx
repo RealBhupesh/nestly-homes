@@ -28,21 +28,27 @@ function AdminAudit() {
 
   const load = () => {
     listAuditLog({ data: { q: "", limit: 300 } })
-      .then((r) => { setRows(r); setLastUpdated(new Date()); })
+      .then((r) => {
+        setRows(r);
+        setLastUpdated(new Date());
+      })
       .catch((e) => toast.error(e.message));
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
   useRealtimeRefresh(["admin_audit_log"], load, { channelName: "admin-audit" });
 
   const filtered = useMemo(() => {
     if (!rows) return null;
     const t = debouncedQ.trim().toLowerCase();
     if (!t) return rows;
-    return rows.filter((r) =>
-      r.action.toLowerCase().includes(t) ||
-      r.entity_type.toLowerCase().includes(t) ||
-      (r.actor_email ?? "").toLowerCase().includes(t) ||
-      (r.entity_id ?? "").toLowerCase().includes(t),
+    return rows.filter(
+      (r) =>
+        r.action.toLowerCase().includes(t) ||
+        r.entity_type.toLowerCase().includes(t) ||
+        (r.actor_email ?? "").toLowerCase().includes(t) ||
+        (r.entity_id ?? "").toLowerCase().includes(t),
     );
   }, [rows, debouncedQ]);
 
@@ -114,32 +120,57 @@ function AdminAudit() {
             </tr>
           </thead>
           <tbody className="divide-y divide-border/70">
-            {rows === null && Array.from({ length: 8 }).map((_, i) => (
-              <tr key={`sk-${i}`}>
-                <td className="px-4 py-3"><div className="h-3 w-32 animate-pulse rounded bg-muted/70" /></td>
-                <td className="px-4 py-3"><div className="h-3.5 w-40 animate-pulse rounded bg-muted" /></td>
-                <td className="px-4 py-3"><div className="h-4 w-20 animate-pulse rounded bg-muted" /></td>
-                <td className="px-4 py-3"><div className="h-4 w-24 animate-pulse rounded-full bg-muted" /></td>
-                <td className="px-4 py-3"><div className="h-3 w-56 animate-pulse rounded bg-muted/70" /></td>
+            {rows === null &&
+              Array.from({ length: 8 }).map((_, i) => (
+                <tr key={`sk-${i}`}>
+                  <td className="px-4 py-3">
+                    <div className="h-3 w-32 animate-pulse rounded bg-muted/70" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-3.5 w-40 animate-pulse rounded bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-20 animate-pulse rounded bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-4 w-24 animate-pulse rounded-full bg-muted" />
+                  </td>
+                  <td className="px-4 py-3">
+                    <div className="h-3 w-56 animate-pulse rounded bg-muted/70" />
+                  </td>
+                </tr>
+              ))}
+            {filtered?.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-4 py-8 text-center text-ink/50">
+                  Nothing logged.
+                </td>
               </tr>
-            ))}
-            {filtered?.length === 0 && <tr><td colSpan={5} className="px-4 py-8 text-center text-ink/50">Nothing logged.</td></tr>}
+            )}
             {filtered?.map((r) => (
               <tr key={r.id}>
                 <td className="px-4 py-3 text-ink/60">{new Date(r.created_at).toLocaleString()}</td>
                 <td className="px-4 py-3 text-ink">{r.actor_email}</td>
                 <td className="px-4 py-3">
-                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-ink">{r.action}</code>
+                  <code className="rounded bg-muted px-1.5 py-0.5 text-[11px] font-medium text-ink">
+                    {r.action}
+                  </code>
                 </td>
                 <td className="px-4 py-3">
-                  <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${COLORS[r.entity_type] ?? "bg-muted text-ink/70"}`}>
+                  <span
+                    className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${COLORS[r.entity_type] ?? "bg-muted text-ink/70"}`}
+                  >
                     {r.entity_type}
                   </span>
-                  {r.entity_id && <span className="ml-2 text-[11px] text-ink/40">{r.entity_id.slice(0, 8)}</span>}
+                  {r.entity_id && (
+                    <span className="ml-2 text-[11px] text-ink/40">{r.entity_id.slice(0, 8)}</span>
+                  )}
                 </td>
                 <td className="px-4 py-3 text-ink/60">
                   {r.metadata && Object.keys(r.metadata).length > 0 && (
-                    <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">{JSON.stringify(r.metadata)}</code>
+                    <code className="rounded bg-muted px-1.5 py-0.5 text-[11px]">
+                      {JSON.stringify(r.metadata)}
+                    </code>
                   )}
                 </td>
               </tr>

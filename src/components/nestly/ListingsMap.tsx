@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef } from "react";
 import Supercluster from "supercluster";
-import type { Listing } from "@/lib/listings-data";
-import { formatMoney } from "@/lib/listings-data";
+import type { GeoListing, Listing } from "@/lib/listings-data";
+import { formatMoney, hasCoords } from "@/lib/listings-data";
 
 interface Props {
   listings: Listing[];
@@ -23,13 +23,27 @@ interface Props {
 
 // Client-only MapLibre wrapper. Dynamically imports maplibre-gl and its CSS
 // inside useEffect so the module never enters the SSR bundle.
-export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = "price", interactive = true, onBoundsChange, fitKey, flyTo, nearIds, radiusKm = 1.5 }: Props) {
+export function ListingsMap({
+  listings: allListings,
+  hoveredId,
+  onHover,
+  onSelect,
+  variant = "price",
+  interactive = true,
+  onBoundsChange,
+  fitKey,
+  flyTo,
+  nearIds,
+  radiusKm = 1.5,
+}: Props) {
+  // Listings without coordinates can't be placed on the map — skip them.
+  const listings = useMemo(() => allListings.filter(hasCoords), [allListings]);
   const containerRef = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<any>(null);
   const markersRef = useRef<Map<string, any>>(new Map());
   const clusterMarkersRef = useRef<any[]>([]);
   const flyMarkerRef = useRef<any>(null);
-  const superRef = useRef<Supercluster<{ id: string; listing: Listing }> | null>(null);
+  const superRef = useRef<Supercluster<{ id: string; listing: GeoListing }> | null>(null);
   const listingsRef = useRef(listings);
   listingsRef.current = listings;
   const onBoundsChangeRef = useRef(onBoundsChange);
@@ -54,7 +68,7 @@ export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = 
 
   // Rebuild the supercluster index whenever the listings change.
   useEffect(() => {
-    const index = new Supercluster<{ id: string; listing: Listing }>({
+    const index = new Supercluster<{ id: string; listing: GeoListing }>({
       // Clustering disabled — every listing renders as its own pin so the map
       // never shows a numeric "N homes here" bubble.
       radius: 0,
@@ -199,7 +213,10 @@ export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = 
       };
       if (!flyTo) {
         if (map.getSource("nestly-radius")) {
-          (map.getSource("nestly-radius") as any).setData({ type: "FeatureCollection", features: [] });
+          (map.getSource("nestly-radius") as any).setData({
+            type: "FeatureCollection",
+            features: [],
+          });
         }
         return;
       }
@@ -317,7 +334,7 @@ export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = 
         continue;
       }
 
-      const l: Listing = props.listing;
+      const l: GeoListing = props.listing;
       seen.add(l.id);
       const existing = markersRef.current.get(l.id);
       if (existing) {
@@ -351,7 +368,7 @@ export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = 
     }
   }
 
-  function applyPriceColor(el: HTMLElement, l: Listing) {
+  function applyPriceColor(el: HTMLElement, l: GeoListing) {
     const { min, max } = priceStatsRef.current[l.listingType] ?? { min: 0, max: 1 };
     const t = Math.max(0, Math.min(1, (l.price - min) / (max - min)));
     el.style.setProperty("--pin-dot", priceRamp(t));
@@ -360,14 +377,23 @@ export function ListingsMap({ listings, hoveredId, onHover, onSelect, variant = 
   function fitToListings(map: any) {
     if (!map || listingsRef.current.length === 0) return;
     // simple bounds
-    let minLat = 90, maxLat = -90, minLng = 180, maxLng = -180;
+    let minLat = 90,
+      maxLat = -90,
+      minLng = 180,
+      maxLng = -180;
     for (const l of listingsRef.current) {
       if (l.lat < minLat) minLat = l.lat;
       if (l.lat > maxLat) maxLat = l.lat;
       if (l.lng < minLng) minLng = l.lng;
       if (l.lng > maxLng) maxLng = l.lng;
     }
-    map.fitBounds([[minLng, minLat], [maxLng, maxLat]], { padding: 60, duration: 400, maxZoom: 14 });
+    map.fitBounds(
+      [
+        [minLng, minLat],
+        [maxLng, maxLat],
+      ],
+      { padding: 60, duration: 400, maxZoom: 14 },
+    );
   }
 
   function emitBounds(map: any) {

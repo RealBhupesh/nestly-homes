@@ -46,7 +46,9 @@ function MyListings() {
   const [stats, setStats] = useState<Record<string, ListingStats>>({});
 
   async function load() {
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
     const { data, error } = await supabase
       .from("listings")
@@ -57,11 +59,15 @@ function MyListings() {
     else {
       const list = data as Row[];
       setRows(list);
-      fetchOwnerListingStats(list.map((r) => r.id)).then(setStats).catch(() => {});
+      fetchOwnerListingStats(list.map((r) => r.id))
+        .then(setStats)
+        .catch(() => {});
     }
   }
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function toggleStatus(r: Row) {
     const next = r.status === "published" ? "draft" : "published";
@@ -81,17 +87,25 @@ function MyListings() {
 
   const summary = useMemo(() => {
     const list = rows ?? [];
-    let views = 0, likes = 0, messages = 0;
+    let views = 0,
+      likes = 0,
+      messages = 0;
     for (const r of list) {
       const s = stats[r.id];
-      if (s) { views += s.views; likes += s.likes; messages += s.messages; }
+      if (s) {
+        views += s.views;
+        likes += s.likes;
+        messages += s.messages;
+      }
     }
     return {
       total: list.length,
       published: list.filter((r) => r.status === "published").length,
       drafts: list.filter((r) => r.status !== "published").length,
       archived: list.filter((r) => r.status === "archived").length,
-      views, likes, messages,
+      views,
+      likes,
+      messages,
     };
   }, [rows, stats]);
 
@@ -138,7 +152,8 @@ function MyListings() {
               Your listings, at a glance.
             </h1>
             <p className="mt-3 max-w-lg text-[13px] leading-relaxed text-cream/70">
-              Publish, edit and share every property from one calm dashboard. No brokers, no clutter — just the essentials.
+              Publish, edit and share every property from one calm dashboard. No brokers, no clutter
+              — just the essentials.
             </p>
             <div className="mt-6 flex flex-wrap items-center gap-2">
               <Link
@@ -157,9 +172,9 @@ function MyListings() {
           </div>
 
           <div className="grid grid-cols-3 gap-3 sm:gap-4">
-              <HeroStat icon={Eye} label="Views" value={summary.views} accent />
-              <HeroStat icon={Heart} label="Likes" value={summary.likes} />
-              <HeroStat icon={MessageSquare} label="Msgs" value={summary.messages} />
+            <HeroStat icon={Eye} label="Views" value={summary.views} accent />
+            <HeroStat icon={Heart} label="Likes" value={summary.likes} />
+            <HeroStat icon={MessageSquare} label="Msgs" value={summary.messages} />
           </div>
         </div>
       </section>
@@ -172,12 +187,26 @@ function MyListings() {
               key={t}
               onClick={() => setTab(t)}
               className={`rounded-full px-3.5 py-1.5 text-[12px] font-medium capitalize transition ${
-                tab === t ? "bg-ink text-cream" : "bg-card text-ink/60 border border-border/60 hover:border-ink hover:text-ink"
+                tab === t
+                  ? "bg-ink text-cream"
+                  : "bg-card text-ink/60 border border-border/60 hover:border-ink hover:text-ink"
               }`}
             >
-              {t === "all" ? "All" : t === "published" ? "Live" : t === "draft" ? "Pending" : "Offline"}
+              {t === "all"
+                ? "All"
+                : t === "published"
+                  ? "Live"
+                  : t === "draft"
+                    ? "Pending"
+                    : "Offline"}
               <span className={`ml-1.5 text-[10px] ${tab === t ? "text-cream/60" : "text-ink/40"}`}>
-                {t === "all" ? summary.total : t === "published" ? summary.published : t === "draft" ? (summary.drafts - summary.archived) : summary.archived}
+                {t === "all"
+                  ? summary.total
+                  : t === "published"
+                    ? summary.published
+                    : t === "draft"
+                      ? summary.drafts - summary.archived
+                      : summary.archived}
               </span>
             </button>
           ))}
@@ -198,7 +227,10 @@ function MyListings() {
         {rows === null && (
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {Array.from({ length: 6 }).map((_, i) => (
-              <div key={i} className="h-64 animate-pulse rounded-2xl border border-border/60 bg-card" />
+              <div
+                key={i}
+                className="h-64 animate-pulse rounded-2xl border border-border/60 bg-card"
+              />
             ))}
           </div>
         )}
@@ -209,7 +241,9 @@ function MyListings() {
               <Building2 className="h-5 w-5" />
             </div>
             <p className="mt-4 text-base font-medium text-ink">No listings yet</p>
-            <p className="mt-1 text-sm text-ink/55">Post your first place in about three minutes.</p>
+            <p className="mt-1 text-sm text-ink/55">
+              Post your first place in about three minutes.
+            </p>
             <Link
               to="/dashboard/new"
               className="mt-6 inline-flex items-center gap-2 rounded-full bg-ink px-4 py-2 text-[13px] font-medium text-cream hover:bg-ink/85"
@@ -259,9 +293,7 @@ function HeroStat({
   return (
     <div
       className={`rounded-2xl border p-3 sm:p-4 ${
-        accent
-          ? "border-primary/40 bg-primary/15"
-          : "border-cream/15 bg-cream/5"
+        accent ? "border-primary/40 bg-primary/15" : "border-cream/15 bg-cream/5"
       }`}
     >
       <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-cream/70">
@@ -325,15 +357,26 @@ function ListingCard({
 
         {/* Engagement */}
         <div className="flex items-center gap-3 text-[11.5px] text-ink/60">
-          <span className="inline-flex items-center gap-1"><Eye className="h-3 w-3" /> <span className="tabular text-ink/85">{stats?.views ?? 0}</span> views</span>
-          <span className="inline-flex items-center gap-1"><Heart className="h-3 w-3" /> <span className="tabular text-ink/85">{stats?.likes ?? 0}</span> likes</span>
-          <span className="inline-flex items-center gap-1"><MessageSquare className="h-3 w-3" /> <span className="tabular text-ink/85">{stats?.messages ?? 0}</span> msgs</span>
+          <span className="inline-flex items-center gap-1">
+            <Eye className="h-3 w-3" />{" "}
+            <span className="tabular text-ink/85">{stats?.views ?? 0}</span> views
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <Heart className="h-3 w-3" />{" "}
+            <span className="tabular text-ink/85">{stats?.likes ?? 0}</span> likes
+          </span>
+          <span className="inline-flex items-center gap-1">
+            <MessageSquare className="h-3 w-3" />{" "}
+            <span className="tabular text-ink/85">{stats?.messages ?? 0}</span> msgs
+          </span>
         </div>
 
         <div className="flex items-end justify-between">
           <p className="tabular text-[16px] font-medium text-ink">
             ₹{r.price_amount.toLocaleString("en-IN")}
-            <span className="text-[11px] font-normal text-ink/45">{r.mode === "rent" ? "/mo" : ""}</span>
+            <span className="text-[11px] font-normal text-ink/45">
+              {r.mode === "rent" ? "/mo" : ""}
+            </span>
           </p>
           <p className="text-[10px] text-ink/45" title={new Date(r.updated_at).toLocaleString()}>
             {statusVerb(r.status)} · {timeAgo(r.updated_at)}
@@ -347,9 +390,13 @@ function ListingCard({
             className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-full bg-ink/5 px-3 py-1.5 text-[12px] font-medium text-ink transition hover:bg-ink hover:text-cream"
           >
             {r.status === "published" ? (
-              <><EyeOff className="h-3.5 w-3.5" /> Unpublish</>
+              <>
+                <EyeOff className="h-3.5 w-3.5" /> Unpublish
+              </>
             ) : (
-              <><Eye className="h-3.5 w-3.5" /> Publish</>
+              <>
+                <Eye className="h-3.5 w-3.5" /> Publish
+              </>
             )}
           </button>
           {r.status === "published" && (
@@ -404,7 +451,9 @@ function StatusBadge({ status }: { status: "draft" | "published" | "archived" })
   } as const;
   const s = map[status] ?? map.draft;
   return (
-    <span className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${s.cls}`}>
+    <span
+      className={`inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide ring-1 ring-inset ${s.cls}`}
+    >
       <span className={`h-1.5 w-1.5 rounded-full ${s.dot}`} />
       {s.label}
     </span>

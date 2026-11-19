@@ -1,4 +1,5 @@
 import { useSyncExternalStore } from "react";
+import { isUuid } from "@/lib/listings-data";
 
 const KEY = "nestly:compare";
 const MAX = 4;
@@ -14,7 +15,16 @@ function read(): string[] {
     const raw = window.localStorage.getItem(KEY);
     if (!raw) return [];
     const parsed = JSON.parse(raw);
-    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string").slice(0, MAX) : [];
+    // Old seed ids ("l-12") from the demo era are dropped silently.
+    const valid = Array.isArray(parsed) ? parsed.filter(isUuid).slice(0, MAX) : [];
+    if (!Array.isArray(parsed) || valid.length !== parsed.length) {
+      try {
+        window.localStorage.setItem(KEY, JSON.stringify(valid));
+      } catch {
+        // ignore
+      }
+    }
+    return valid;
   } catch {
     return [];
   }
@@ -74,6 +84,7 @@ export function useCompareIds(): string[] {
 
 export function toggleCompare(id: string): { added: boolean; full: boolean } {
   ensureHydrated();
+  if (!isUuid(id)) return { added: false, full: false };
   if (ids.includes(id)) {
     ids = ids.filter((x) => x !== id);
     emit();
@@ -103,4 +114,13 @@ export function clearCompare() {
 
 export function isCompared(id: string, current: string[]): boolean {
   return current.includes(id);
+}
+/** Drop ids that no longer resolve to a published listing. */
+export function retainCompare(validIds: string[]) {
+  ensureHydrated();
+  const keep = new Set(validIds);
+  const next = ids.filter((x) => keep.has(x));
+  if (next.length === ids.length) return;
+  ids = next;
+  emit();
 }

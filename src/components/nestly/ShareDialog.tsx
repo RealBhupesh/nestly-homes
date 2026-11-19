@@ -25,7 +25,8 @@ export function ShareDialog({ open, onClose, listingId, title, city, price, mode
     const parts: string[] = [];
     parts.push(`🏠 ${title}`);
     if (city) parts.push(`📍 ${city}`);
-    if (price && mode) parts.push(`💸 ₹${price.toLocaleString("en-IN")}${mode === "rent" ? "/mo" : ""}`);
+    if (price && mode)
+      parts.push(`💸 ₹${price.toLocaleString("en-IN")}${mode === "rent" ? "/mo" : ""}`);
     parts.push("");
     parts.push("Zero brokerage. See photos + details on Nestly:");
     parts.push(url);
@@ -57,7 +58,10 @@ export function ShareDialog({ open, onClose, listingId, title, city, price, mode
   if (!open) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center" onClick={onClose}>
+    <div
+      className="fixed inset-0 z-[100] flex items-end justify-center bg-black/40 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+    >
       <div
         onClick={(e) => e.stopPropagation()}
         className="w-full max-w-md rounded-t-2xl border border-border bg-background p-6 shadow-2xl sm:rounded-2xl"
@@ -67,19 +71,32 @@ export function ShareDialog({ open, onClose, listingId, title, city, price, mode
             <p className="text-[11px] tracking-wide text-ink/50">Share listing</p>
             <h3 className="mt-1 text-lg font-medium text-ink">Send it in one tap</h3>
           </div>
-          <button onClick={onClose} className="rounded-full p-1.5 text-ink/50 hover:bg-muted hover:text-ink" aria-label="Close">
+          <button
+            onClick={onClose}
+            className="rounded-full p-1.5 text-ink/50 hover:bg-muted hover:text-ink"
+            aria-label="Close"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
 
         <div className="mt-5 flex gap-5">
           <div id="nestly-share-qr" className="rounded-xl border border-border bg-white p-3">
-            <QRCodeCanvas value={url} size={128} bgColor="#ffffff" fgColor="#1D1D28" level="M" includeMargin={false} />
+            <QRCodeCanvas
+              value={url}
+              size={128}
+              bgColor="#ffffff"
+              fgColor="#1D1D28"
+              level="M"
+              includeMargin={false}
+            />
           </div>
           <div className="flex-1 min-w-0 space-y-3">
             <div>
               <p className="truncate text-[13px] font-medium text-ink">{title}</p>
-              <p className="mt-0.5 truncate text-[11px] text-ink/50">{url.replace(/^https?:\/\//, "")}</p>
+              <p className="mt-0.5 truncate text-[11px] text-ink/50">
+                {url.replace(/^https?:\/\//, "")}
+              </p>
             </div>
             <button
               onClick={downloadQR}

@@ -1,2 +1,10 @@
+# Update the Sitemap URL below when you move to a custom domain.
 User-agent: *
 Allow: /
+Disallow: /dashboard
+Disallow: /admin
+Disallow: /api/
+Disallow: /auth
+Disallow: /reset-password
+
+Sitemap: https://nestly-homes.vercel.app/sitemap.xml
