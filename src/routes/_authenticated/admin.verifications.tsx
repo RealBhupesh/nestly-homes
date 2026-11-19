@@ -2,8 +2,12 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { toast } from "sonner";
-import { Check, Loader2, X } from "lucide-react";
-import { decideVerification, listVerifications } from "@/lib/verification.functions";
+import { Check, FileText, Loader2, X } from "lucide-react";
+import {
+  decideVerification,
+  getVerificationDocumentUrl,
+  listVerifications,
+} from "@/lib/verification.functions";
 
 export const Route = createFileRoute("/_authenticated/admin/verifications")({
   component: AdminVerifications,
@@ -21,6 +25,7 @@ const FILTERS = ["pending", "approved", "rejected", "all"] as const;
 function AdminVerifications() {
   const load = useServerFn(listVerifications);
   const decide = useServerFn(decideVerification);
+  const docUrl = useServerFn(getVerificationDocumentUrl);
   const [status, setStatus] = useState<(typeof FILTERS)[number]>("pending");
   const [rows, setRows] = useState<Row[]>([]);
   const [loading, setLoading] = useState(true);
@@ -34,12 +39,37 @@ function AdminVerifications() {
       .finally(() => setLoading(false));
   }, [status]);
 
+  async function viewDoc(id: string) {
+    // Open the tab synchronously so popup blockers allow it, then point it at the signed URL.
+    const win = window.open("about:blank", "_blank");
+    setBusy(id);
+    try {
+      const { url } = await docUrl({ data: { id } });
+      if (win) {
+        win.opener = null;
+        win.location.href = url;
+      } else {
+        window.location.assign(url);
+      }
+    } catch (e) {
+      win?.close();
+      toast.error(e instanceof Error ? e.message : "Could not open document");
+    } finally {
+      setBusy(null);
+    }
+  }
+
   async function act(id: string, decision: "approved" | "rejected") {
     setBusy(id);
     try {
-      const note = decision === "rejected" ? window.prompt("Reason (optional)") ?? undefined : undefined;
+      const note =
+        decision === "rejected" ? (window.prompt("Reason (optional)") ?? undefined) : undefined;
       await decide({ data: { id, decision, note } });
-      setRows((p) => (status === "all" ? p.map((r) => (r.id === id ? { ...r, status: decision } : r)) : p.filter((r) => r.id !== id)));
+      setRows((p) =>
+        status === "all"
+          ? p.map((r) => (r.id === id ? { ...r, status: decision } : r))
+          : p.filter((r) => r.id !== id),
+      );
       toast.success(`Request ${decision}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Could not update");
@@ -51,8 +81,12 @@ function AdminVerifications() {
   return (
     <div className="mx-auto max-w-[900px] px-4 py-8 sm:px-6">
       <header className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">Trust &amp; safety</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">Owner verifications</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">
+          Trust &amp; safety
+        </p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink">
+          Owner verifications
+        </h1>
       </header>
 
       <div className="mb-5 flex flex-wrap gap-2">
@@ -62,7 +96,9 @@ function AdminVerifications() {
             type="button"
             onClick={() => setStatus(f)}
             className={`h-9 rounded-full border px-3.5 text-[12.5px] font-medium capitalize transition ${
-              status === f ? "border-ink bg-ink text-background" : "border-ink/12 text-ink/65 hover:border-ink/35"
+              status === f
+                ? "border-ink bg-ink text-background"
+                : "border-ink/12 text-ink/65 hover:border-ink/35"
             }`}
           >
             {f}
@@ -85,21 +121,45 @@ function AdminVerifications() {
               <div className="min-w-0">
                 <p className="text-[14px] font-semibold text-ink">{r.full_name}</p>
                 <p className="text-[12.5px] text-ink/55">
-                  {r.display_name ?? "—"} · {r.phone} · {new Date(r.created_at).toLocaleDateString()}
+                  {r.display_name ?? "—"} · {r.phone} ·{" "}
+                  {new Date(r.created_at).toLocaleDateString("en-IN")}
+                  {!r.document_path && " · No document"}
                 </p>
-                {r.review_note && <p className="mt-1 text-[12.5px] text-ink/55">Note: {r.review_note}</p>}
+                {r.review_note && (
+                  <p className="mt-1 text-[12.5px] text-ink/55">Note: {r.review_note}</p>
+                )}
               </div>
               <div className="flex items-center gap-2">
                 <span className="rounded-full bg-ink/[0.06] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink/60">
                   {r.status}
                 </span>
+                {r.document_path && (
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => viewDoc(r.id)}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04] disabled:opacity-60"
+                  >
+                    <FileText className="h-3.5 w-3.5" /> View document
+                  </button>
+                )}
                 {r.status !== "approved" && (
-                  <button type="button" disabled={busy === r.id} onClick={() => act(r.id, "approved")} className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[12.5px] font-semibold text-background hover:brightness-110 disabled:opacity-60">
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => act(r.id, "approved")}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full bg-ink px-3.5 text-[12.5px] font-semibold text-background hover:brightness-110 disabled:opacity-60"
+                  >
                     <Check className="h-3.5 w-3.5" /> Approve
                   </button>
                 )}
                 {r.status !== "rejected" && (
-                  <button type="button" disabled={busy === r.id} onClick={() => act(r.id, "rejected")} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04] disabled:opacity-60">
+                  <button
+                    type="button"
+                    disabled={busy === r.id}
+                    onClick={() => act(r.id, "rejected")}
+                    className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04] disabled:opacity-60"
+                  >
                     <X className="h-3.5 w-3.5" /> Reject
                   </button>
                 )}

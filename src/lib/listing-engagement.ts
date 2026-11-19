@@ -1,5 +1,6 @@
 import { useEffect, useState, useCallback } from "react";
 import { supabase } from "@/integrations/supabase/client";
+import { isUuid } from "@/lib/listings-data";
 
 // Untyped table access — regenerated types lag behind migrations.
 const db = supabase as unknown as {
@@ -11,17 +12,30 @@ const db = supabase as unknown as {
 // spam the table.
 export function trackListingView(listingId: string) {
   if (typeof window === "undefined") return;
+  // Only real DB listings are tracked (never legacy seed ids).
+  if (!isUuid(listingId)) return;
   try {
     const key = `nly:view:${listingId}`;
     if (sessionStorage.getItem(key)) return;
     sessionStorage.setItem(key, "1");
-  } catch {}
-  supabase.auth.getUser().then(({ data }) => {
-    db.from("listing_views").insert({
-      listing_id: listingId,
-      viewer_id: data.user?.id ?? null,
-    }).then(() => {}, () => {});
-  });
+  } catch {
+    // sessionStorage unavailable (private mode) — still record the view
+  }
+  // viewer_id is either null (anonymous) or the signed-in user's own id.
+  supabase.auth.getSession().then(
+    ({ data }) => {
+      db.from("listing_views")
+        .insert({
+          listing_id: listingId,
+          viewer_id: data.session?.user?.id ?? null,
+        })
+        .then(
+          () => {},
+          () => {},
+        );
+    },
+    () => {},
+  );
 }
 
 // Aggregate stats for a listing owner's dashboard.
@@ -63,27 +77,39 @@ export function useListingLike(listingId: string) {
 
   useEffect(() => {
     let mounted = true;
+    if (!isUuid(listingId)) return;
     (async () => {
-      const { data } = await supabase.auth.getUser();
+      const { data } = await supabase.auth.getSession();
       if (!mounted) return;
-      const uid = data.user?.id ?? null;
+      const uid = data.session?.user?.id ?? null;
       setUserId(uid);
 
       const [countRes, mineRes] = await Promise.all([
-        db.from("listing_likes").select("listing_id", { count: "exact", head: true }).eq("listing_id", listingId),
+        db
+          .from("listing_likes")
+          .select("listing_id", { count: "exact", head: true })
+          .eq("listing_id", listingId),
         uid
-          ? db.from("listing_likes").select("listing_id").eq("listing_id", listingId).eq("user_id", uid).maybeSingle()
+          ? db
+              .from("listing_likes")
+              .select("listing_id")
+              .eq("listing_id", listingId)
+              .eq("user_id", uid)
+              .maybeSingle()
           : Promise.resolve({ data: null }),
       ]);
       if (!mounted) return;
       setCount(countRes.count ?? 0);
       setLiked(!!mineRes.data);
     })();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [listingId]);
 
   const toggle = useCallback(async () => {
     if (!userId) return { needsAuth: true as const };
+    if (!isUuid(listingId)) return { needsAuth: false as const };
     if (busy) return { needsAuth: false as const };
     setBusy(true);
     const wasLiked = liked;

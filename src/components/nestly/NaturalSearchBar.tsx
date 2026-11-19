@@ -1,6 +1,9 @@
 import { useEffect, useRef, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { toast } from "sonner";
 import { parseNaturalSearch } from "@/lib/nl-search.functions";
+import { useAuth } from "@/hooks/use-auth";
 
 const EXAMPLES = [
   "quiet 1BHK under 15k near COEP with a balcony",
@@ -11,9 +14,13 @@ const EXAMPLES = [
 export function NaturalSearchBar({
   onApply,
 }: {
-  onApply: (patch: Record<string, string | number>) => void;
+  onApply: (patch: Record<string, unknown>) => void;
 }) {
   const parse = useServerFn(parseNaturalSearch);
+  const { user, loading: authLoading } = useAuth();
+  const navigate = useNavigate();
+  const href = useRouterState({ select: (s) => s.location.href });
+  const goSignIn = () => navigate({ to: "/auth", search: { redirect: href } as never });
   const [value, setValue] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -24,10 +31,20 @@ export function NaturalSearchBar({
   const submit = async (text: string) => {
     const q = text.trim();
     if (!q || busy) return;
+    if (!user) {
+      // AI search needs an account; fall back to a plain keyword search.
+      onApply({ q: q.slice(0, 120) });
+      setOpen(false);
+      toast.message("Searching by keyword", {
+        description: "Sign in to let Nestly AI turn your sentence into filters.",
+        action: { label: "Sign in", onClick: goSignIn },
+      });
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
-      const { patch } = await parse({ data: { query: q } });
+      const { patch } = (await parse({ data: { query: q } })) as { patch: Record<string, unknown> };
       const keys = Object.keys(patch);
       if (keys.length === 0) {
         setError("Couldn't extract filters — try being more specific.");
@@ -50,7 +67,10 @@ export function NaturalSearchBar({
       if (e.key === "Escape") setOpen(false);
     };
     window.addEventListener("keydown", onKey);
-    return () => { clearTimeout(t); window.removeEventListener("keydown", onKey); };
+    return () => {
+      clearTimeout(t);
+      window.removeEventListener("keydown", onKey);
+    };
   }, [open]);
 
   return (
@@ -63,8 +83,19 @@ export function NaturalSearchBar({
         className="group fixed bottom-6 left-1/2 z-40 -translate-x-1/2 grid h-14 w-14 place-items-center rounded-full bg-gradient-to-br from-primary via-primary to-fuchsia-600 text-cream shadow-lift transition hover:-translate-y-0.5 hover:shadow-[0_18px_40px_-12px_rgba(126,34,206,0.55)] sm:bottom-8 sm:h-16 sm:w-16"
         style={{ bottom: "calc(1.5rem + env(safe-area-inset-bottom))" }}
       >
-        <span className="absolute inset-0 rounded-full bg-primary/40 opacity-60 blur-xl transition group-hover:opacity-90" aria-hidden />
-        <svg viewBox="0 0 24 24" className="relative h-6 w-6 sm:h-7 sm:w-7" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+        <span
+          className="absolute inset-0 rounded-full bg-primary/40 opacity-60 blur-xl transition group-hover:opacity-90"
+          aria-hidden
+        />
+        <svg
+          viewBox="0 0 24 24"
+          className="relative h-6 w-6 sm:h-7 sm:w-7"
+          fill="none"
+          stroke="currentColor"
+          strokeWidth="2"
+          strokeLinecap="round"
+          strokeLinejoin="round"
+        >
           <path d="M12 3l1.6 4.2L18 8.8l-4.4 1.6L12 14.6l-1.6-4.2L6 8.8l4.4-1.6z" />
           <path d="M18.5 14.5l.9 2.1 2.1.9-2.1.9-.9 2.1-.9-2.1-2.1-.9 2.1-.9z" />
         </svg>
@@ -104,8 +135,13 @@ export function NaturalSearchBar({
                       <span className="relative inline-flex h-2 w-2 rounded-full bg-teal" />
                     </span>
                   </h2>
-                  <p className="text-[13.5px] italic text-ink/55" style={{ fontFamily: "'Lora', serif" }}>
-                    Your personal housing journal assistant
+                  <p
+                    className="text-[13.5px] italic text-ink/55"
+                    style={{ fontFamily: "'Lora', serif" }}
+                  >
+                    {!authLoading && !user
+                      ? "Sign in to use AI filters — without it we'll search by keyword."
+                      : "Describe what you want; we'll set the filters."}
                   </p>
                 </div>
                 <button
@@ -114,23 +150,41 @@ export function NaturalSearchBar({
                   className="grid h-9 w-9 place-items-center rounded-full text-ink/40 transition hover:bg-ink/[0.04] hover:text-ink"
                   aria-label="Close"
                 >
-                  <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round"><path d="M6 6l12 12M18 6L6 18"/></svg>
+                  <svg
+                    viewBox="0 0 24 24"
+                    className="h-5 w-5"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                  >
+                    <path d="M6 6l12 12M18 6L6 18" />
+                  </svg>
                 </button>
               </div>
 
               {/* Input */}
               <form
-                onSubmit={(e) => { e.preventDefault(); void submit(value); }}
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  void submit(value);
+                }}
                 className="relative mb-7 group"
               >
-                <div aria-hidden className="pointer-events-none absolute -inset-0.5 rounded-[1.15rem] bg-gradient-to-r from-teal/25 to-coral/25 opacity-30 blur transition duration-500 group-focus-within:opacity-100" />
+                <div
+                  aria-hidden
+                  className="pointer-events-none absolute -inset-0.5 rounded-[1.15rem] bg-gradient-to-r from-teal/25 to-coral/25 opacity-30 blur transition duration-500 group-focus-within:opacity-100"
+                />
                 <div className="relative">
                   <textarea
                     ref={inputRef as unknown as React.RefObject<HTMLTextAreaElement>}
                     value={value}
                     onChange={(e) => setValue(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); void submit(value); }
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        void submit(value);
+                      }
                     }}
                     placeholder="Describe your ideal place — quiet 1BHK under 15k near COEP with a balcony"
                     disabled={busy}
@@ -144,7 +198,17 @@ export function NaturalSearchBar({
                     aria-label="Search"
                   >
                     {busy ? "Thinking…" : "Search"}
-                    <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>
+                    <svg
+                      viewBox="0 0 24 24"
+                      className="h-4 w-4"
+                      fill="none"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    >
+                      <path d="M5 12h14M12 5l7 7-7 7" />
+                    </svg>
                   </button>
                 </div>
               </form>
@@ -161,7 +225,10 @@ export function NaturalSearchBar({
                       <li key={ex}>
                         <button
                           type="button"
-                          onClick={() => { setValue(ex); void submit(ex); }}
+                          onClick={() => {
+                            setValue(ex);
+                            void submit(ex);
+                          }}
                           disabled={busy}
                           className={`group/item flex w-full items-center gap-4 rounded-xl border border-ink/[0.06] bg-white/60 p-3.5 text-left transition disabled:opacity-40 ${
                             accent === "teal"
@@ -176,7 +243,15 @@ export function NaturalSearchBar({
                                 : "text-coral group-hover/item:bg-coral group-hover/item:text-background"
                             }`}
                           >
-                            <svg viewBox="0 0 24 24" className="h-5 w-5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                            <svg
+                              viewBox="0 0 24 24"
+                              className="h-5 w-5"
+                              fill="none"
+                              stroke="currentColor"
+                              strokeWidth="1.8"
+                              strokeLinecap="round"
+                              strokeLinejoin="round"
+                            >
                               {accent === "teal" ? (
                                 <>
                                   <path d="M3 11l9-7 9 7" />
@@ -191,8 +266,12 @@ export function NaturalSearchBar({
                             </svg>
                           </span>
                           <span className="min-w-0 flex-1">
-                            <span className="block truncate text-[13.5px] font-semibold text-ink">{ex}</span>
-                            <span className="mt-0.5 block text-[11.5px] text-ink/50">Tap to search this instantly</span>
+                            <span className="block truncate text-[13.5px] font-semibold text-ink">
+                              {ex}
+                            </span>
+                            <span className="mt-0.5 block text-[11.5px] text-ink/50">
+                              Tap to search this instantly
+                            </span>
                           </span>
                         </button>
                       </li>
@@ -203,7 +282,8 @@ export function NaturalSearchBar({
                 <div className="min-h-[16px] pt-2 text-[11.5px]">
                   {lastApplied && !error && (
                     <p className="text-ink/60">
-                      Applied <span className="font-semibold text-teal">{lastApplied.join(", ")}</span>
+                      Applied{" "}
+                      <span className="font-semibold text-teal">{lastApplied.join(", ")}</span>
                     </p>
                   )}
                   {error && <p className="text-coral">{error}</p>}

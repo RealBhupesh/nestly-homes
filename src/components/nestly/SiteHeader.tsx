@@ -56,10 +56,18 @@ export function SiteHeader() {
         {/* Center: pill nav */}
         <nav className="relative hidden md:block">
           <ul className="flex items-center gap-0.5">
-            <NavPill to="/search" search={{ mode: "rent" }}>Rent</NavPill>
-            <NavPill to="/search" search={{ mode: "sale" }}>Buy</NavPill>
-            <NavPill to={user ? "/dashboard/new" : "/auth"} live>List a place</NavPill>
-            <NavPill to="/" hash="how">How it works</NavPill>
+            <NavPill to="/search" search={{ mode: "rent" }}>
+              Rent
+            </NavPill>
+            <NavPill to="/search" search={{ mode: "sale" }}>
+              Buy
+            </NavPill>
+            <NavPill to={user ? "/dashboard/new" : "/auth"} live>
+              List a place
+            </NavPill>
+            <NavPill to="/" hash="how">
+              How it works
+            </NavPill>
           </ul>
         </nav>
 
@@ -90,9 +98,19 @@ export function SiteHeader() {
           >
             <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
               {open ? (
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               ) : (
-                <path d="M4 8h16M4 16h16" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path
+                  d="M4 8h16M4 16h16"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               )}
             </svg>
           </button>
@@ -123,7 +141,9 @@ export function SiteHeader() {
         >
           {/* Header */}
           <div className="flex items-center justify-between border-b border-ink/[0.06] px-5 py-4">
-            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/50">Menu</span>
+            <span className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/50">
+              Menu
+            </span>
             <button
               type="button"
               aria-label="Close menu"
@@ -131,7 +151,12 @@ export function SiteHeader() {
               className="inline-flex h-9 w-9 items-center justify-center rounded-full border border-ink/10 text-ink transition hover:bg-ink/[0.04] active:scale-95"
             >
               <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4">
-                <path d="M6 6l12 12M18 6L6 18" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
+                <path
+                  d="M6 6l12 12M18 6L6 18"
+                  stroke="currentColor"
+                  strokeWidth="1.8"
+                  strokeLinecap="round"
+                />
               </svg>
             </button>
           </div>
@@ -139,8 +164,20 @@ export function SiteHeader() {
           {/* Scrollable body */}
           <div className="flex-1 overflow-y-auto px-4 pb-6 pt-4">
             <DrawerSection label="Browse" open={open} delay={60}>
-              <DrawerItem to="/search" search={{ mode: "rent" }} icon="rent" title="Rent" subtitle="Rooms, PGs & flats to rent" />
-              <DrawerItem to="/search" search={{ mode: "sale" }} icon="buy" title="Buy" subtitle="Homes for sale near you" />
+              <DrawerItem
+                to="/search"
+                search={{ mode: "rent" }}
+                icon="rent"
+                title="Rent"
+                subtitle="Rooms, PGs & flats to rent"
+              />
+              <DrawerItem
+                to="/search"
+                search={{ mode: "sale" }}
+                icon="buy"
+                title="Buy"
+                subtitle="Homes for sale near you"
+              />
             </DrawerSection>
 
             <DrawerSection label="For owners" open={open} delay={140}>
@@ -155,14 +192,30 @@ export function SiteHeader() {
 
             <DrawerSection label="Account" open={open} delay={220}>
               {user ? (
-                <DrawerItem to="/dashboard" icon="dashboard" title="Dashboard" subtitle="Manage your listings" />
+                <DrawerItem
+                  to="/dashboard"
+                  icon="dashboard"
+                  title="Dashboard"
+                  subtitle="Manage your listings"
+                />
               ) : (
-                <DrawerItem to="/auth" icon="dashboard" title="Sign in" subtitle="Access your dashboard" />
+                <DrawerItem
+                  to="/auth"
+                  icon="dashboard"
+                  title="Sign in"
+                  subtitle="Access your dashboard"
+                />
               )}
             </DrawerSection>
 
             <DrawerSection label="Support" open={open} delay={300}>
-              <DrawerItem to="/" hash="how" icon="help" title="Help" subtitle="How Nestly works & FAQs" />
+              <DrawerItem
+                to="/"
+                hash="how"
+                icon="help"
+                title="Help"
+                subtitle="How Nestly works & FAQs"
+              />
             </DrawerSection>
           </div>
 
@@ -229,12 +282,28 @@ function CtaLink({ to, label }: { to: string; label: string }) {
       <span
         aria-hidden
         className="absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100"
-        style={{ background: "radial-gradient(120% 100% at 100% 50%, rgba(255,90,95,0.35), transparent 60%)" }}
+        style={{
+          background:
+            "radial-gradient(120% 100% at 100% 50%, rgba(255,90,95,0.35), transparent 60%)",
+        }}
       />
       <span className="relative whitespace-nowrap">{label}</span>
-      <span aria-hidden className="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden">
-        <svg viewBox="0 0 24 24" fill="none" className="h-3 w-3 text-background transition-transform duration-300 group-hover:translate-x-0.5">
-          <path d="M5 12h14M13 6l6 6-6 6" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
+      <span
+        aria-hidden
+        className="relative inline-flex h-4 w-4 items-center justify-center overflow-hidden"
+      >
+        <svg
+          viewBox="0 0 24 24"
+          fill="none"
+          className="h-3 w-3 text-background transition-transform duration-300 group-hover:translate-x-0.5"
+        >
+          <path
+            d="M5 12h14M13 6l6 6-6 6"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </span>
     </Link>
@@ -316,7 +385,13 @@ function DrawerItem({
           fill="none"
           className="h-4 w-4 shrink-0 text-ink/30 transition-transform duration-300 group-hover:translate-x-0.5 group-hover:text-ink/60"
         >
-          <path d="M9 6l6 6-6 6" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+          <path
+            d="M9 6l6 6-6 6"
+            stroke="currentColor"
+            strokeWidth="1.8"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          />
         </svg>
       </Link>
     </li>
@@ -324,7 +399,13 @@ function DrawerItem({
 }
 
 function DrawerGlyph({ name }: { name: DrawerIcon }) {
-  const stroke = { stroke: "currentColor", strokeWidth: 1.6, strokeLinecap: "round", strokeLinejoin: "round", fill: "none" } as const;
+  const stroke = {
+    stroke: "currentColor",
+    strokeWidth: 1.6,
+    strokeLinecap: "round",
+    strokeLinejoin: "round",
+    fill: "none",
+  } as const;
   switch (name) {
     case "rent":
       return (

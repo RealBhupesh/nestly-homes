@@ -10,7 +10,11 @@ import { buildIcs, downloadIcs } from "@/lib/ics";
 type Slot = TourSlotRow & { taken: number };
 
 function fmtDay(iso: string) {
-  return new Date(iso).toLocaleDateString(undefined, { weekday: "short", day: "numeric", month: "short" });
+  return new Date(iso).toLocaleDateString(undefined, {
+    weekday: "short",
+    day: "numeric",
+    month: "short",
+  });
 }
 function fmtTime(iso: string) {
   return new Date(iso).toLocaleTimeString(undefined, { hour: "numeric", minute: "2-digit" });
@@ -122,15 +126,34 @@ export function BookTourSheet({
   }
 
   return (
-    <div role="dialog" aria-modal="true" aria-label="Book a tour" className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center">
-      <button type="button" aria-label="Close" onClick={onClose} className="absolute inset-0 bg-ink/50 backdrop-blur-sm" />
+    <div
+      role="dialog"
+      aria-modal="true"
+      aria-label="Book a tour"
+      className="fixed inset-0 z-[95] flex items-end justify-center sm:items-center"
+    >
+      <button
+        type="button"
+        aria-label="Close"
+        onClick={onClose}
+        className="absolute inset-0 bg-ink/50 backdrop-blur-sm"
+      />
       <div className="relative w-full max-w-lg rounded-t-3xl border border-ink/10 bg-background p-5 shadow-2xl sm:rounded-3xl">
         <div className="mb-4 flex items-start justify-between gap-3">
           <div>
-            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">Schedule</p>
-            <h3 className="font-display text-xl font-semibold text-ink">{done ? "Tour requested" : "Book a tour"}</h3>
+            <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">
+              Schedule
+            </p>
+            <h3 className="font-display text-xl font-semibold text-ink">
+              {done ? "Tour requested" : "Book a tour"}
+            </h3>
           </div>
-          <button type="button" onClick={onClose} aria-label="Close" className="grid h-8 w-8 place-items-center rounded-full text-ink/50 hover:bg-ink/[0.05]">
+          <button
+            type="button"
+            onClick={onClose}
+            aria-label="Close"
+            className="grid h-8 w-8 place-items-center rounded-full text-ink/50 hover:bg-ink/[0.05]"
+          >
             <X className="h-4 w-4" />
           </button>
         </div>
@@ -145,22 +168,41 @@ export function BookTourSheet({
                 <p className="font-semibold text-ink">
                   {fmtDay(done.start.toISOString())} · {fmtTime(done.start.toISOString())}
                 </p>
-                <p className="mt-1">We've sent your request. You'll get a confirmation once the owner accepts.</p>
+                <p className="mt-1">
+                  We've sent your request. You'll get a confirmation once the owner accepts.
+                </p>
               </div>
             </div>
             <div className="flex gap-2">
-              <button type="button" onClick={addToCalendar} className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-ink/12 bg-background text-[13.5px] font-medium text-ink hover:bg-ink/[0.04]">
+              <button
+                type="button"
+                onClick={addToCalendar}
+                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full border border-ink/12 bg-background text-[13.5px] font-medium text-ink hover:bg-ink/[0.04]"
+              >
                 <CalendarPlus className="h-4 w-4" /> Add to calendar
               </button>
-              <button type="button" onClick={onClose} className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-ink text-[13.5px] font-semibold text-background hover:brightness-110">
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex h-11 flex-1 items-center justify-center rounded-full bg-ink text-[13.5px] font-semibold text-background hover:brightness-110"
+              >
                 Done
               </button>
             </div>
           </div>
         ) : !user ? (
           <div className="space-y-4">
-            <p className="text-[13.5px] text-ink/70">Sign in to book a visit — it keeps your tours and messages in one place.</p>
-            <button type="button" onClick={() => { onClose(); navigate({ to: "/auth" }); }} className="h-11 w-full rounded-full bg-ink text-[13.5px] font-semibold text-background hover:brightness-110">
+            <p className="text-[13.5px] text-ink/70">
+              Sign in to book a visit — it keeps your tours and messages in one place.
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                onClose();
+                navigate({ to: "/auth" });
+              }}
+              className="h-11 w-full rounded-full bg-ink text-[13.5px] font-semibold text-background hover:brightness-110"
+            >
               Sign in to continue
             </button>
           </div>
@@ -172,7 +214,9 @@ export function BookTourSheet({
               </div>
             ) : grouped.length > 0 ? (
               <div>
-                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-ink/45">Open slots</p>
+                <p className="mb-2 text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                  Open slots
+                </p>
                 <div className="max-h-52 space-y-3 overflow-y-auto pr-1">
                   {grouped.map(([day, daySlots]) => (
                     <div key={day}>
@@ -182,9 +226,14 @@ export function BookTourSheet({
                           <button
                             key={s.id}
                             type="button"
-                            onClick={() => { setSlotId(s.id === slotId ? null : s.id); setProposed(""); }}
+                            onClick={() => {
+                              setSlotId(s.id === slotId ? null : s.id);
+                              setProposed("");
+                            }}
                             className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[12.5px] transition ${
-                              slotId === s.id ? "border-ink bg-ink text-background" : "border-ink/12 bg-background text-ink hover:border-ink/35"
+                              slotId === s.id
+                                ? "border-ink bg-ink text-background"
+                                : "border-ink/12 bg-background text-ink hover:border-ink/35"
                             }`}
                           >
                             <Clock className="h-3.5 w-3.5" /> {fmtTime(s.starts_at)}
@@ -197,13 +246,16 @@ export function BookTourSheet({
               </div>
             ) : (
               <p className="rounded-2xl bg-ink/[0.04] p-3 text-[13px] text-ink/60">
-                No published slots yet — propose a time that works for you and the owner will confirm.
+                No published slots yet — propose a time that works for you and the owner will
+                confirm.
               </p>
             )}
 
             {!slotId && (
               <label className="block">
-                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Propose a time</span>
+                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                  Propose a time
+                </span>
                 <input
                   type="datetime-local"
                   value={proposed}
@@ -215,7 +267,9 @@ export function BookTourSheet({
 
             <div className="grid grid-cols-2 gap-3">
               <label className="block">
-                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">People</span>
+                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                  People
+                </span>
                 <input
                   type="number"
                   min={1}
@@ -226,7 +280,9 @@ export function BookTourSheet({
                 />
               </label>
               <label className="block">
-                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Phone (optional)</span>
+                <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                  Phone (optional)
+                </span>
                 <input
                   value={phone}
                   onChange={(e) => setPhone(e.target.value.slice(0, 24))}
@@ -237,7 +293,9 @@ export function BookTourSheet({
             </div>
 
             <label className="block">
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Note (optional)</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                Note (optional)
+              </span>
               <textarea
                 rows={2}
                 value={note}

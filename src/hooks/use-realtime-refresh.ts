@@ -23,11 +23,7 @@ export function useRealtimeRefresh(
     };
     const ch = supabase.channel(name);
     for (const table of tables) {
-      (ch as any).on(
-        "postgres_changes",
-        { event: "*", schema: "public", table },
-        fire,
-      );
+      (ch as any).on("postgres_changes", { event: "*", schema: "public", table }, fire);
     }
     ch.subscribe();
     return () => {

@@ -14,9 +14,15 @@ function AdminPhotos() {
 
   async function load() {
     setRows(null);
-    try { setRows(await listAllPhotos()); } catch (e: any) { toast.error(e.message); }
+    try {
+      setRows(await listAllPhotos());
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function remove(id: string) {
     if (!confirm("Delete this photo? This also removes the file from storage.")) return;
@@ -25,7 +31,9 @@ function AdminPhotos() {
       setRows((r) => r?.filter((x) => x.id !== id) ?? null);
       setPreview(null);
       toast.success("Deleted");
-    } catch (e: any) { toast.error(e.message); }
+    } catch (e: any) {
+      toast.error(e.message);
+    }
   }
 
   return (
@@ -44,7 +52,12 @@ function AdminPhotos() {
             onClick={() => setPreview(p)}
             className="group relative aspect-square overflow-hidden rounded-xl border border-border/70 bg-muted"
           >
-            <img src={p.url} alt="" loading="lazy" className="h-full w-full object-cover transition group-hover:scale-105" />
+            <img
+              src={p.url}
+              alt=""
+              loading="lazy"
+              className="h-full w-full object-cover transition group-hover:scale-105"
+            />
             <span className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 to-transparent p-2 text-left text-[10px] font-medium text-white opacity-0 group-hover:opacity-100">
               {new Date(p.created_at).toLocaleDateString()}
             </span>
@@ -52,12 +65,20 @@ function AdminPhotos() {
         ))}
       </div>
       {rows?.length === 0 && (
-        <p className="rounded-2xl border border-dashed border-border/70 p-10 text-center text-sm text-ink/50">No photos yet.</p>
+        <p className="rounded-2xl border border-dashed border-border/70 p-10 text-center text-sm text-ink/50">
+          No photos yet.
+        </p>
       )}
 
       {preview && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={() => setPreview(null)}>
-          <div className="max-h-[90vh] max-w-4xl overflow-hidden rounded-2xl bg-card" onClick={(e) => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setPreview(null)}
+        >
+          <div
+            className="max-h-[90vh] max-w-4xl overflow-hidden rounded-2xl bg-card"
+            onClick={(e) => e.stopPropagation()}
+          >
             <img src={preview.url} alt="" className="max-h-[70vh] w-full object-contain bg-black" />
             <div className="flex items-center justify-between gap-3 border-t border-border/70 p-4 text-[13px]">
               <div className="min-w-0 truncate text-ink/60">{preview.storage_path}</div>

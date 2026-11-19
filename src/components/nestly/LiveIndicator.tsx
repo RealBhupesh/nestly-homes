@@ -29,9 +29,7 @@ export function LiveIndicator({ lastUpdated }: { lastUpdated: Date | null }) {
       </span>
       <span className="font-medium text-ink/70">Live</span>
       <span className="text-ink/40">·</span>
-      <span>
-        {lastUpdated ? `Updated ${formatRelative(lastUpdated, now)}` : "Connecting…"}
-      </span>
+      <span>{lastUpdated ? `Updated ${formatRelative(lastUpdated, now)}` : "Connecting…"}</span>
     </span>
   );
 }

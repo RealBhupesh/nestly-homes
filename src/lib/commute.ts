@@ -15,10 +15,22 @@ export interface CommuteDest {
 // Curated Pune destinations. `custom` slot is reserved for a user pin.
 export const COMMUTE_DESTS: CommuteDest[] = [
   { key: "coep", label: "COEP Tech University", hint: "Shivaji Nagar", lat: 18.5308, lng: 73.8475 },
-  { key: "sym-viman", label: "Symbiosis Viman Nagar", hint: "Viman Nagar", lat: 18.5679, lng: 73.9143 },
+  {
+    key: "sym-viman",
+    label: "Symbiosis Viman Nagar",
+    hint: "Viman Nagar",
+    lat: 18.5679,
+    lng: 73.9143,
+  },
   { key: "hinjewadi", label: "Hinjewadi IT Park", hint: "Phase 1", lat: 18.5913, lng: 73.7389 },
-  { key: "pune-station", label: "Pune Railway Station", hint: "Central", lat: 18.5286, lng: 73.8743 },
-  { key: "magarpatta", label: "Magarpatta City", hint: "Hadapsar", lat: 18.5158, lng: 73.9280 },
+  {
+    key: "pune-station",
+    label: "Pune Railway Station",
+    hint: "Central",
+    lat: 18.5286,
+    lng: 73.8743,
+  },
+  { key: "magarpatta", label: "Magarpatta City", hint: "Hadapsar", lat: 18.5158, lng: 73.928 },
 ];
 
 // km/h — conservative urban averages including stops/lights.
@@ -43,7 +55,10 @@ export const MODE_ICON: Record<CommuteMode, string> = {
   drive: "🚗",
 };
 
-export function haversineKm(a: { lat: number; lng: number }, b: { lat: number; lng: number }): number {
+export function haversineKm(
+  a: { lat: number; lng: number },
+  b: { lat: number; lng: number },
+): number {
   const R = 6371;
   const toRad = (d: number) => (d * Math.PI) / 180;
   const dLat = toRad(b.lat - a.lat);

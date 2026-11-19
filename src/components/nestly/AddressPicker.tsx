@@ -1,22 +1,35 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin, Search } from "lucide-react";
+import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
 
-interface Coords { lat: number; lng: number }
+interface Coords {
+  lat: number;
+  lng: number;
+}
 
 interface Props {
   value: Coords | null;
-  onChange: (coords: Coords, address?: {
-    address_line?: string; city?: string; state?: string; postal_code?: string; country?: string;
-  }) => void;
+  onChange: (
+    coords: Coords,
+    address?: {
+      address_line?: string;
+      city?: string;
+      state?: string;
+      postal_code?: string;
+      country?: string;
+    },
+  ) => void;
   initialCenter?: Coords;
 }
 
-// Drop a pin on the map to set coordinates. Uses Nominatim (OpenStreetMap)
-// for reverse & forward geocoding — free, no key, rate-limited (be gentle).
+// Drop a pin on the map to set coordinates. Forward & reverse geocoding go
+// through our own /api/public/geocode proxy (which caches and rate-limits
+// calls to Nominatim/OpenStreetMap and returns its jsonv2 payload unchanged),
+// so browsers never hit Nominatim directly.
 export function AddressPicker({ value, onChange, initialCenter }: Props) {
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const mapRef = useRef<any>(null);
-  const markerRef = useRef<any>(null);
+  const mapRef = useRef<MapLibreMap | null>(null);
+  const markerRef = useRef<Marker | null>(null);
   const [loading, setLoading] = useState(false);
   const [query, setQuery] = useState("");
   const [searching, setSearching] = useState(false);
@@ -42,11 +55,14 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
         attributionControl: { compact: true },
       });
       map.addControl(new maplibregl.NavigationControl({ visualizePitch: false }), "top-right");
-      map.addControl(new maplibregl.GeolocateControl({
-        positionOptions: { enableHighAccuracy: true },
-        trackUserLocation: false,
-        showUserLocation: true,
-      }), "top-right");
+      map.addControl(
+        new maplibregl.GeolocateControl({
+          positionOptions: { enableHighAccuracy: true },
+          trackUserLocation: false,
+          showUserLocation: true,
+        }),
+        "top-right",
+      );
 
       mapRef.current = map;
 
@@ -54,46 +70,58 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
         if (markerRef.current) markerRef.current.remove();
         const el = document.createElement("div");
         el.className = "nestly-address-pin";
-        markerRef.current = new maplibregl.Marker({ element: el, draggable: true, anchor: "bottom" })
+        markerRef.current = new maplibregl.Marker({
+          element: el,
+          draggable: true,
+          anchor: "bottom",
+        })
           .setLngLat([lng, lat])
           .addTo(map);
         markerRef.current.on("dragend", () => {
-          const p = markerRef.current.getLngLat();
+          const p = markerRef.current?.getLngLat();
+          if (!p) return;
           void reverseGeocode(p.lat, p.lng);
         });
       };
 
       if (value) placeMarker(value.lng, value.lat);
 
-      map.on("click", (e: any) => {
+      map.on("click", (e: MapMouseEvent) => {
         placeMarker(e.lngLat.lng, e.lngLat.lat);
         void reverseGeocode(e.lngLat.lat, e.lngLat.lng);
       });
     })();
-    return () => { cancelled = true; mapRef.current?.remove(); };
+    return () => {
+      cancelled = true;
+      mapRef.current?.remove();
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   async function reverseGeocode(lat: number, lng: number) {
     setLoading(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${lat}&lon=${lng}&addressdetails=1`,
-        { headers: { "Accept-Language": "en" } },
-      );
+      const params = new URLSearchParams({ lat: String(lat), lon: String(lng) });
+      const res = await fetch(`/api/public/geocode?${params}`, {
+        headers: { Accept: "application/json" },
+      });
       if (!res.ok) throw new Error("Lookup failed");
       const data = await res.json();
       const a = data.address ?? {};
-      const addressLine = [a.house_number, a.road].filter(Boolean).join(" ") ||
+      const addressLine =
+        [a.house_number, a.road].filter(Boolean).join(" ") ||
         [a.neighbourhood, a.suburb].filter(Boolean).join(", ") ||
         data.display_name?.split(",").slice(0, 2).join(",");
-      onChange({ lat, lng }, {
-        address_line: addressLine,
-        city: a.city ?? a.town ?? a.village ?? a.municipality ?? a.county,
-        state: a.state,
-        postal_code: a.postcode,
-        country: a.country,
-      });
+      onChange(
+        { lat, lng },
+        {
+          address_line: addressLine,
+          city: a.city ?? a.town ?? a.village ?? a.municipality ?? a.county,
+          state: a.state,
+          postal_code: a.postcode,
+          country: a.country,
+        },
+      );
     } catch {
       onChange({ lat, lng });
     } finally {
@@ -106,14 +134,16 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
     if (!query.trim()) return;
     setSearching(true);
     try {
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?format=jsonv2&limit=1&q=${encodeURIComponent(query)}`,
-        { headers: { "Accept-Language": "en" } },
-      );
+      const params = new URLSearchParams({ q: query.trim(), limit: "1" });
+      const res = await fetch(`/api/public/geocode?${params}`, {
+        headers: { Accept: "application/json" },
+      });
+      if (!res.ok) return;
       const results = await res.json();
-      const hit = results?.[0];
+      const hit = Array.isArray(results) ? results[0] : undefined;
       if (!hit) return;
-      const lat = Number(hit.lat), lng = Number(hit.lon);
+      const lat = Number(hit.lat),
+        lng = Number(hit.lon);
       mapRef.current?.flyTo({ center: [lng, lat], zoom: 16 });
       // Simulate a click so we drop a marker + reverse geocode for structured fields
       if (mapRef.current) {
@@ -121,8 +151,13 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
         if (markerRef.current) markerRef.current.remove();
         const el = document.createElement("div");
         el.className = "nestly-address-pin";
-        markerRef.current = new maplibregl.Marker({ element: el, draggable: true, anchor: "bottom" })
-          .setLngLat([lng, lat]).addTo(mapRef.current);
+        markerRef.current = new maplibregl.Marker({
+          element: el,
+          draggable: true,
+          anchor: "bottom",
+        })
+          .setLngLat([lng, lat])
+          .addTo(mapRef.current);
       }
       await reverseGeocode(lat, lng);
     } finally {
@@ -162,7 +197,8 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
 
       <p className="flex items-start gap-1.5 text-[11px] text-ink/50">
         <MapPin className="mt-0.5 h-3 w-3 shrink-0" />
-        Tap anywhere on the map to drop a pin. Drag it to fine-tune. We'll auto-fill city, state and postal code.
+        Tap anywhere on the map to drop a pin. Drag it to fine-tune. We'll auto-fill city, state and
+        postal code.
       </p>
     </div>
   );

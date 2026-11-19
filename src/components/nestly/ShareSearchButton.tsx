@@ -13,8 +13,10 @@ export function ShareSearchButton() {
         try {
           await navigator.share({ title: "Nestly search", url });
           return;
-        } catch {
-          /* fall through to clipboard */
+        } catch (err) {
+          // User dismissed the share sheet — don't also copy.
+          if (err instanceof DOMException && err.name === "AbortError") return;
+          /* otherwise fall through to clipboard */
         }
       }
       await navigator.clipboard.writeText(url);
@@ -33,7 +35,11 @@ export function ShareSearchButton() {
       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-card px-3 py-1.5 text-[12px] font-semibold text-ink transition hover:-translate-y-0.5 hover:shadow-tactile"
       title="Copy this search link with your radius and location"
     >
-      {copied ? <Check className="h-3.5 w-3.5 text-emerald-600" /> : <Share2 className="h-3.5 w-3.5" />}
+      {copied ? (
+        <Check className="h-3.5 w-3.5 text-emerald-600" />
+      ) : (
+        <Share2 className="h-3.5 w-3.5" />
+      )}
       {copied ? "Copied" : "Share search"}
     </button>
   );

@@ -5,7 +5,13 @@ import { supabase } from "@/integrations/supabase/client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
 import { toast } from "sonner";
 import { Loader2, Upload, Trash2, Star, ImageIcon, Sparkles, GripVertical } from "lucide-react";
@@ -17,6 +23,13 @@ import {
   type ListingInput,
 } from "@/lib/listing-schema";
 import { autofillListingFromPhotos } from "@/lib/ai-listing.functions";
+import {
+  checkImageFile,
+  extensionForMime,
+  mapWithConcurrency,
+  prepareImageForUpload,
+  UPLOAD_CONCURRENCY,
+} from "@/lib/image-upload";
 import { AddressPicker } from "./AddressPicker";
 import { PlaceAutocomplete } from "./PlaceAutocomplete";
 import { X as XIcon, MapPin, Check, PanelLeftClose, PanelLeftOpen } from "lucide-react";
@@ -28,12 +41,7 @@ import {
   useSensors,
   type DragEndEvent,
 } from "@dnd-kit/core";
-import {
-  SortableContext,
-  arrayMove,
-  rectSortingStrategy,
-  useSortable,
-} from "@dnd-kit/sortable";
+import { SortableContext, arrayMove, rectSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 
 const SIGNED_URL_YEARS = 60 * 60 * 24 * 365 * 10; // 10 years
@@ -88,9 +96,14 @@ const defaults: ListingInput = {
 
 export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: Props) {
   const navigate = useNavigate();
-  const [form, setForm] = useState<ListingInput>({ ...defaults, ...(initial ?? {}) } as ListingInput);
+  const [form, setForm] = useState<ListingInput>({
+    ...defaults,
+    ...(initial ?? {}),
+  } as ListingInput);
   const [photos, setPhotos] = useState<ExistingPhoto[]>(initialPhotos);
-  const [coverUrl, setCoverUrl] = useState<string | null>(initial?.cover_photo_url ?? initialPhotos[0]?.url ?? null);
+  const [coverUrl, setCoverUrl] = useState<string | null>(
+    initial?.cover_photo_url ?? initialPhotos[0]?.url ?? null,
+  );
   const [uploading, setUploading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [aiLoading, setAiLoading] = useState(false);
@@ -136,10 +149,7 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
     const handle = setTimeout(() => {
       try {
         const savedAt = Date.now();
-        localStorage.setItem(
-          autosaveKey(userId, listingId),
-          JSON.stringify({ form, savedAt }),
-        );
+        localStorage.setItem(autosaveKey(userId, listingId), JSON.stringify({ form, savedAt }));
         setAutosavedAt(savedAt);
       } catch {
         // storage full or blocked — silent
@@ -196,26 +206,39 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
 
   async function handleFiles(files: FileList | null) {
     if (!files || files.length === 0) return;
+    // Validate the originals first (type + 8MB), so obviously bad files never get decoded.
+    const accepted: File[] = [];
+    for (const file of Array.from(files)) {
+      const check = checkImageFile(file);
+      if (check.ok) accepted.push(file);
+      else toast.error(check.reason);
+    }
+    if (accepted.length === 0) {
+      if (fileRef.current) fileRef.current.value = "";
+      return;
+    }
     setUploading(true);
     try {
       const id = await ensureListing();
       const nextPos = photos.length;
-      const uploads: ExistingPhoto[] = [];
-      let i = 0;
-      for (const file of Array.from(files)) {
-        if (!file.type.startsWith("image/")) continue;
-        if (file.size > 8 * 1024 * 1024) {
-          toast.error(`${file.name} is over 8MB`);
-          continue;
+
+      const uploadOne = async (file: File, index: number): Promise<ExistingPhoto | null> => {
+        // Downscale + re-encode to WebP (strips EXIF/GPS). Falls back to the original.
+        const blob = await prepareImageForUpload(file);
+        const contentType = blob.type || file.type;
+        const check = checkImageFile({ name: file.name, type: contentType, size: blob.size });
+        if (!check.ok) {
+          toast.error(check.reason);
+          return null;
         }
-        const ext = file.name.split(".").pop()?.toLowerCase() || "jpg";
+        const ext = extensionForMime(contentType);
         const path = `${userId}/${id}/${Date.now()}-${Math.random().toString(36).slice(2, 8)}.${ext}`;
         const { error: upErr } = await supabase.storage
           .from("listing-photos")
-          .upload(path, file, { cacheControl: "31536000", upsert: false, contentType: file.type });
+          .upload(path, blob, { cacheControl: "31536000", upsert: false, contentType });
         if (upErr) {
-          toast.error(upErr.message);
-          continue;
+          toast.error(`${file.name}: ${upErr.message}`);
+          return null;
         }
         const { data: signed } = await supabase.storage
           .from("listing-photos")
@@ -223,22 +246,39 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
         const url = signed?.signedUrl ?? "";
         const { data: row, error: dbErr } = await supabase
           .from("listing_photos")
-          .insert({ listing_id: id, owner_id: userId, storage_path: path, url, position: nextPos + i })
+          .insert({
+            listing_id: id,
+            owner_id: userId,
+            storage_path: path,
+            url,
+            position: nextPos + index,
+          })
           .select("id, url, storage_path, position")
           .single();
         if (dbErr || !row) {
           toast.error(dbErr?.message ?? "Save failed");
-          continue;
+          // Don't leave an orphaned object in storage.
+          await supabase.storage.from("listing-photos").remove([path]);
+          return null;
         }
-        uploads.push(row);
-        i++;
-      }
+        return row;
+      };
+
+      const results = await mapWithConcurrency(accepted, UPLOAD_CONCURRENCY, (file, index) =>
+        uploadOne(file, index).catch((e) => {
+          toast.error(`${file.name}: ${e instanceof Error ? e.message : "upload failed"}`);
+          return null;
+        }),
+      );
+      const uploads = results.filter((r): r is ExistingPhoto => r !== null);
+
       setPhotos((p) => [...p, ...uploads]);
       if (!coverUrl && uploads[0]) {
         setCoverUrl(uploads[0].url);
         await supabase.from("listings").update({ cover_photo_url: uploads[0].url }).eq("id", id);
       }
-      if (uploads.length) toast.success(`Uploaded ${uploads.length} photo${uploads.length > 1 ? "s" : ""}`);
+      if (uploads.length)
+        toast.success(`Uploaded ${uploads.length} photo${uploads.length > 1 ? "s" : ""}`);
     } catch (e) {
       toast.error(e instanceof Error ? e.message : "Upload failed");
     } finally {
@@ -255,13 +295,15 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
     if (coverUrl === p.url) {
       const next = photos.find((x) => x.id !== p.id)?.url ?? null;
       setCoverUrl(next);
-      if (listingId) await supabase.from("listings").update({ cover_photo_url: next }).eq("id", listingId);
+      if (listingId)
+        await supabase.from("listings").update({ cover_photo_url: next }).eq("id", listingId);
     }
   }
 
   async function setCover(p: ExistingPhoto) {
     setCoverUrl(p.url);
-    if (listingId) await supabase.from("listings").update({ cover_photo_url: p.url }).eq("id", listingId);
+    if (listingId)
+      await supabase.from("listings").update({ cover_photo_url: p.url }).eq("id", listingId);
     toast.success("Cover photo updated");
   }
 
@@ -328,7 +370,7 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
       }
       const payload = {
         ...parsed.data,
-        status: publish ? "published" as const : (parsed.data.status ?? "draft"),
+        status: publish ? ("published" as const) : (parsed.data.status ?? "draft"),
         cover_photo_url: coverUrl,
         owner_id: userId,
       };
@@ -340,7 +382,11 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
         const { error } = await supabase.from("listings").update(payload).eq("id", listingId);
         if (error) throw error;
       } else {
-        const { data, error } = await supabase.from("listings").insert(payload).select("id").single();
+        const { data, error } = await supabase
+          .from("listings")
+          .insert(payload)
+          .select("id")
+          .single();
         if (error || !data) throw error ?? new Error("Insert failed");
         navigate({ to: "/dashboard/$id/edit", params: { id: data.id }, replace: true });
       }
@@ -433,8 +479,8 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
                         done
                           ? "bg-black text-white"
                           : active
-                          ? "border border-black text-black"
-                          : "border border-black/15 text-black/40"
+                            ? "border border-black text-black"
+                            : "border border-black/15 text-black/40"
                       }`}
                     >
                       {done ? <Check className="h-2.5 w-2.5" strokeWidth={2.5} /> : s.num}
@@ -457,7 +503,11 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
             railOpen ? "left-[196px]" : "left-4"
           }`}
         >
-          {railOpen ? <PanelLeftClose className="h-3.5 w-3.5" /> : <PanelLeftOpen className="h-3.5 w-3.5" />}
+          {railOpen ? (
+            <PanelLeftClose className="h-3.5 w-3.5" />
+          ) : (
+            <PanelLeftOpen className="h-3.5 w-3.5" />
+          )}
           <span>{railOpen ? "Hide" : "Steps"}</span>
         </button>
 
@@ -472,335 +522,519 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
           </div>
 
           <div className="space-y-10 sm:space-y-14">
-        <Section active={activeStep==="basics"} id="basics" title="Basics" number="01" hint="Title, mode and a short description.">
-          <Field label="Listing title">
-            <Input value={form.title} onChange={(e) => update("title", e.target.value)} maxLength={120} placeholder="Sunny 2BHK next to COEP" />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Mode">
-              <Select value={form.mode} onValueChange={(v) => update("mode", v as "rent" | "sale")}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="rent">For rent</SelectItem>
-                  <SelectItem value="sale">For sale</SelectItem>
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Property type">
-              <Select value={form.property_type} onValueChange={(v) => update("property_type", v as ListingInput["property_type"])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {PROPERTY_TYPES.map((t) => (
-                    <SelectItem key={t} value={t} className="capitalize">{t}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </Field>
-          </div>
-          <Field label="Description">
-            <Textarea
-              value={form.description}
-              onChange={(e) => update("description", e.target.value)}
-              rows={6}
-              maxLength={4000}
-              placeholder="What makes this place special? Nearby cafes, sunlight, quiet street…"
-            />
-          </Field>
-        </Section>
-
-        <Section active={activeStep==="details"} id="details" title="Details" number="02" hint="Rooms, size and amenities.">
-          <div className="grid grid-cols-3 gap-3 sm:gap-4">
-            <Field label="Bedrooms">
-              <Input type="number" min={0} max={20} value={form.bedrooms} onChange={(e) => update("bedrooms", Number(e.target.value))} />
-            </Field>
-            <Field label="Bathrooms">
-              <Input type="number" min={0} max={20} value={form.bathrooms} onChange={(e) => update("bathrooms", Number(e.target.value))} />
-            </Field>
-            <Field label="Area (sqft)">
-              <Input type="number" min={0} value={form.area_sqft ?? ""} onChange={(e) => update("area_sqft", e.target.value ? Number(e.target.value) : null)} />
-            </Field>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Furnishing">
-              <Select value={form.furnishing} onValueChange={(v) => update("furnishing", v as ListingInput["furnishing"])}>
-                <SelectTrigger><SelectValue /></SelectTrigger>
-                <SelectContent>
-                  {FURNISHINGS.map((f) => (<SelectItem key={f} value={f} className="capitalize">{f}</SelectItem>))}
-                </SelectContent>
-              </Select>
-            </Field>
-            <Field label="Available from">
-              <Input type="date" value={form.available_from ?? ""} onChange={(e) => update("available_from", e.target.value || null)} />
-            </Field>
-          </div>
-          <Field label="Amenities">
-            <div className="flex flex-wrap gap-2">
-              {AMENITY_OPTIONS.map((a) => {
-                const active = form.amenities.includes(a);
-                return (
-                  <button
-                    type="button"
-                    key={a}
-                    onClick={() => toggleAmenity(a)}
-                    className={`rounded-full border px-3 py-1.5 text-[12px] transition ${
-                      active
-                        ? "border-black bg-black text-white"
-                        : "border-black/12 bg-white text-black/65 hover:border-black hover:text-black"
-                    }`}
+            <Section
+              active={activeStep === "basics"}
+              id="basics"
+              title="Basics"
+              number="01"
+              hint="Title, mode and a short description."
+            >
+              <Field label="Listing title">
+                <Input
+                  value={form.title}
+                  onChange={(e) => update("title", e.target.value)}
+                  maxLength={120}
+                  placeholder="Sunny 2BHK next to COEP"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Mode">
+                  <Select
+                    value={form.mode}
+                    onValueChange={(v) => update("mode", v as "rent" | "sale")}
                   >
-                    {a}
-                  </button>
-                );
-              })}
-            </div>
-          </Field>
-        </Section>
-
-        <Section active={activeStep==="pricing"} id="pricing" title="Pricing" number="03" hint="Set a fair number. You can change it later.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label={form.mode === "rent" ? "Monthly rent (₹)" : "Sale price (₹)"}>
-              <Input type="number" min={0} placeholder="0" value={form.price_amount || ""} onChange={(e) => update("price_amount", e.target.value ? Number(e.target.value) : 0)} />
-            </Field>
-            <Field label={form.mode === "rent" ? "Deposit (₹)" : "Booking amount (₹)"}>
-              <Input type="number" min={0} value={form.deposit_amount ?? ""} onChange={(e) => update("deposit_amount", e.target.value ? Number(e.target.value) : null)} />
-            </Field>
-          </div>
-          {form.mode === "rent" && (
-            <div className="mt-6 border-t border-black/[0.08] pt-6">
-              <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
-                <div className="max-w-sm">
-                  <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/45">Sharing · optional</p>
-                  <h4 className="mt-1.5 text-[16px] font-medium leading-snug text-black">Tenants you're seeking</h4>
-                  <p className="mt-1 text-[12.5px] leading-relaxed text-black/55">
-                    If you're open to sharing, we'll show a per-person price to seekers.
-                  </p>
-                </div>
-                <div className="flex items-center gap-2">
-                  <button
-                    type="button"
-                    aria-label="Decrease"
-                    onClick={() =>
-                      update("seeking_count", form.seeking_count && form.seeking_count > 1 ? form.seeking_count - 1 : null)
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="rent">For rent</SelectItem>
+                      <SelectItem value="sale">For sale</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Property type">
+                  <Select
+                    value={form.property_type}
+                    onValueChange={(v) =>
+                      update("property_type", v as ListingInput["property_type"])
                     }
-                    className="grid h-9 w-9 place-items-center rounded-full border border-black/15 bg-white text-black/70 transition hover:border-black hover:text-black"
                   >
-                    −
-                  </button>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {PROPERTY_TYPES.map((t) => (
+                        <SelectItem key={t} value={t} className="capitalize">
+                          {t}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+              </div>
+              <Field label="Description">
+                <Textarea
+                  value={form.description}
+                  onChange={(e) => update("description", e.target.value)}
+                  rows={6}
+                  maxLength={4000}
+                  placeholder="What makes this place special? Nearby cafes, sunlight, quiet street…"
+                />
+              </Field>
+            </Section>
+
+            <Section
+              active={activeStep === "details"}
+              id="details"
+              title="Details"
+              number="02"
+              hint="Rooms, size and amenities."
+            >
+              <div className="grid grid-cols-3 gap-3 sm:gap-4">
+                <Field label="Bedrooms">
                   <Input
                     type="number"
-                    min={1}
+                    min={0}
                     max={20}
-                    value={form.seeking_count ?? ""}
-                    placeholder="—"
-                    onChange={(e) => {
-                      const v = e.target.value ? Math.max(1, Math.min(20, Number(e.target.value))) : null;
-                      update("seeking_count", v);
-                    }}
-                    className="h-9 w-16 border-black/15 bg-white text-center tabular-nums"
+                    value={form.bedrooms}
+                    onChange={(e) => update("bedrooms", Number(e.target.value))}
                   />
-                  <button
-                    type="button"
-                    aria-label="Increase"
-                    onClick={() =>
-                      update("seeking_count", Math.min(20, (form.seeking_count ?? 0) + 1))
+                </Field>
+                <Field label="Bathrooms">
+                  <Input
+                    type="number"
+                    min={0}
+                    max={20}
+                    value={form.bathrooms}
+                    onChange={(e) => update("bathrooms", Number(e.target.value))}
+                  />
+                </Field>
+                <Field label="Area (sqft)">
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.area_sqft ?? ""}
+                    onChange={(e) =>
+                      update("area_sqft", e.target.value ? Number(e.target.value) : null)
                     }
-                    className="grid h-9 w-9 place-items-center rounded-full border border-black/15 bg-white text-black/70 transition hover:border-black hover:text-black"
+                  />
+                </Field>
+              </div>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Furnishing">
+                  <Select
+                    value={form.furnishing}
+                    onValueChange={(v) => update("furnishing", v as ListingInput["furnishing"])}
                   >
-                    +
-                  </button>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {FURNISHINGS.map((f) => (
+                        <SelectItem key={f} value={f} className="capitalize">
+                          {f}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </Field>
+                <Field label="Available from">
+                  <Input
+                    type="date"
+                    value={form.available_from ?? ""}
+                    onChange={(e) => update("available_from", e.target.value || null)}
+                  />
+                </Field>
+              </div>
+              <Field label="Amenities">
+                <div className="flex flex-wrap gap-2">
+                  {AMENITY_OPTIONS.map((a) => {
+                    const active = form.amenities.includes(a);
+                    return (
+                      <button
+                        type="button"
+                        key={a}
+                        onClick={() => toggleAmenity(a)}
+                        className={`rounded-full border px-3 py-1.5 text-[12px] transition ${
+                          active
+                            ? "border-black bg-black text-white"
+                            : "border-black/12 bg-white text-black/65 hover:border-black hover:text-black"
+                        }`}
+                      >
+                        {a}
+                      </button>
+                    );
+                  })}
                 </div>
-              </div>
-              {form.seeking_count && form.seeking_count > 0 ? (
-                <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] pt-4">
-                  <div className="text-[10px] uppercase tracking-[0.2em] text-black/45">
-                    Per person / month
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <span className="text-[18px] leading-none text-black/70">₹</span>
-                    <Input
-                      type="number"
-                      min={0}
-                      value={form.price_amount && form.seeking_count ? Math.round(form.price_amount / form.seeking_count) : ""}
-                      placeholder="0"
-                      onChange={(e) => {
-                        const per = e.target.value ? Number(e.target.value) : 0;
-                        update("price_amount", per * (form.seeking_count ?? 1));
-                      }}
-                      className="h-10 w-32 border-black/15 bg-white text-right text-[18px] font-medium tabular-nums"
-                    />
-                    {form.price_amount > 0 ? (
-                      <span className="text-[11.5px] text-black/45">
-                        × {form.seeking_count} = ₹{Number(form.price_amount).toLocaleString("en-IN")}
-                      </span>
-                    ) : null}
-                  </div>
-                </div>
-              ) : null}
-            </div>
-          )}
-        </Section>
+              </Field>
+            </Section>
 
-        <Section active={activeStep==="location"} id="location" title="Location" number="04" hint="Drop a pin — we'll fill in the address for you.">
-          <AddressPicker
-            value={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : null}
-            onChange={(coords, addr) => {
-              setForm((f) => ({
-                ...f,
-                latitude: coords.lat,
-                longitude: coords.lng,
-                address_line: addr?.address_line || f.address_line,
-                city: addr?.city || f.city,
-                state: addr?.state ?? f.state,
-                postal_code: addr?.postal_code ?? f.postal_code,
-                country: addr?.country || f.country,
-              }));
-            }}
-          />
-          <Field label="Address line">
-            <Input value={form.address_line} onChange={(e) => update("address_line", e.target.value)} placeholder="Flat 3B, Shivaji Nagar" />
-          </Field>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <Field label="City"><Input value={form.city} onChange={(e) => update("city", e.target.value)} /></Field>
-            <Field label="State"><Input value={form.state ?? ""} onChange={(e) => update("state", e.target.value || null)} /></Field>
-            <Field label="Postal code"><Input value={form.postal_code ?? ""} onChange={(e) => update("postal_code", e.target.value || null)} /></Field>
-          </div>
-          <div className="border-t border-black/[0.08] pt-6">
-            <div className="mb-4 flex items-start justify-between gap-3">
-              <div>
-                <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/45">Nearby · recommended</p>
-                <h4 className="mt-1.5 text-[16px] font-medium leading-snug text-black">Near to</h4>
-                <p className="mt-1 max-w-[52ch] text-[12.5px] leading-relaxed text-black/55">
-                  Tag colleges, metro stops, parks — seekers filter by these.
-                </p>
-              </div>
-              <span className="shrink-0 text-[11px] tabular-nums text-black/45">
-                {form.nearby.length}/5
-              </span>
-            </div>
-            <PlaceAutocomplete
-              value={nearbyQuery}
-              onChange={setNearbyQuery}
-              onPick={(p) => {
-                setForm((f) => {
-                  const exists = f.nearby.some((n) => n.label.toLowerCase() === p.label.toLowerCase());
-                  if (exists || f.nearby.length >= 5) return f;
-                  return {
-                    ...f,
-                    nearby: [...f.nearby, { label: p.label, lat: p.lat ?? null, lng: p.lng ?? null }],
-                  };
-                });
-                setNearbyQuery("");
-              }}
-              placeholder="Search a college, metro, café, park…"
-              center={form.latitude != null && form.longitude != null ? { lat: form.latitude, lng: form.longitude } : null}
-              radiusKm={2}
-            />
-            {form.nearby.length === 0 ? (
-              <div className="mt-3 flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-black/40">Try</span>
-                {["college", "metro station", "IT park", "hospital", "mall"].map((s) => (
-                  <button
-                    key={s}
-                    type="button"
-                    onClick={() => setNearbyQuery(s)}
-                    className="rounded-full border border-black/12 bg-white px-2.5 py-0.5 text-[11px] text-black/60 transition hover:border-black hover:text-black"
-                  >
-                    {s}
-                  </button>
-                ))}
-              </div>
-            ) : (
-              <div className="mt-3 flex flex-wrap gap-2">
-                {form.nearby.map((n, i) => (
-                  <span
-                    key={`${n.label}-${i}`}
-                    className="inline-flex items-center gap-1.5 rounded-full border border-black/12 bg-white py-1 pl-2.5 pr-1 text-[12px] text-black"
-                  >
-                    <MapPin className="h-3 w-3 text-black/40" />
-                    {n.label}
-                    <button
-                      type="button"
-                      aria-label={`Remove ${n.label}`}
-                      onClick={() =>
-                        setForm((f) => ({ ...f, nearby: f.nearby.filter((_, j) => j !== i) }))
-                      }
-                      className="grid h-5 w-5 place-items-center rounded-full text-black/40 transition hover:bg-black/[0.06] hover:text-black"
-                    >
-                      <XIcon className="h-3 w-3" />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-        </Section>
-
-        <Section active={activeStep==="photos"} id="photos" title="Photos" number="05" hint="Drag to reorder. First photo becomes the cover. Up to 8MB each.">
-          <div
-            className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/15 bg-white p-8 text-center transition hover:border-black/40 sm:p-12"
-            onDragOver={(e) => e.preventDefault()}
-            onDrop={(e) => { e.preventDefault(); handleFiles(e.dataTransfer.files); }}
-          >
-            <ImageIcon className="mb-3 h-5 w-5 text-black/30" strokeWidth={1.5} />
-            <p className="text-[13px] text-black/70">Drop images here, or</p>
-            <input ref={fileRef} type="file" accept="image/*" multiple className="hidden" onChange={(e) => handleFiles(e.target.files)} />
-            <button
-              type="button"
-              disabled={uploading}
-              onClick={() => fileRef.current?.click()}
-              className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-black underline underline-offset-4 decoration-black/25 hover:decoration-black"
+            <Section
+              active={activeStep === "pricing"}
+              id="pricing"
+              title="Pricing"
+              number="03"
+              hint="Set a fair number. You can change it later."
             >
-              {uploading ? (<><Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…</>) : (<><Upload className="h-3.5 w-3.5" /> browse from your device</>)}
-            </button>
-            <p className="mt-3 text-[11px] text-black/40">JPG · PNG · WebP · up to 8MB each</p>
-          </div>
-
-          {photos.length > 0 && (
-            <>
-              <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-black/[0.08] py-3">
-                <div className="flex items-center gap-2 text-[12px] text-black/60">
-                  <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
-                  Have AI draft your title, description & amenities from these photos.
-                </div>
-                <button
-                  type="button"
-                  onClick={runAiAutofill}
-                  disabled={aiLoading || uploading}
-                  className="inline-flex items-center gap-1.5 text-[12px] font-medium text-black underline underline-offset-4 decoration-black/25 transition hover:decoration-black disabled:opacity-50"
-                >
-                  {aiLoading ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
-                  {aiLoading ? "Reading photos…" : "Autofill with AI"}
-                </button>
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label={form.mode === "rent" ? "Monthly rent (₹)" : "Sale price (₹)"}>
+                  <Input
+                    type="number"
+                    min={0}
+                    placeholder="0"
+                    value={form.price_amount || ""}
+                    onChange={(e) =>
+                      update("price_amount", e.target.value ? Number(e.target.value) : 0)
+                    }
+                  />
+                </Field>
+                <Field label={form.mode === "rent" ? "Deposit (₹)" : "Booking amount (₹)"}>
+                  <Input
+                    type="number"
+                    min={0}
+                    value={form.deposit_amount ?? ""}
+                    onChange={(e) =>
+                      update("deposit_amount", e.target.value ? Number(e.target.value) : null)
+                    }
+                  />
+                </Field>
               </div>
-              <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleDragEnd}>
-                <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
-                  <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                    {photos.map((p) => (
-                      <SortablePhoto
-                        key={p.id}
-                        photo={p}
-                        isCover={coverUrl === p.url}
-                        onSetCover={() => setCover(p)}
-                        onRemove={() => removePhoto(p)}
+              {form.mode === "rent" && (
+                <div className="mt-6 border-t border-black/[0.08] pt-6">
+                  <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+                    <div className="max-w-sm">
+                      <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/45">
+                        Sharing · optional
+                      </p>
+                      <h4 className="mt-1.5 text-[16px] font-medium leading-snug text-black">
+                        Tenants you're seeking
+                      </h4>
+                      <p className="mt-1 text-[12.5px] leading-relaxed text-black/55">
+                        If you're open to sharing, we'll show a per-person price to seekers.
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        aria-label="Decrease"
+                        onClick={() =>
+                          update(
+                            "seeking_count",
+                            form.seeking_count && form.seeking_count > 1
+                              ? form.seeking_count - 1
+                              : null,
+                          )
+                        }
+                        className="grid h-9 w-9 place-items-center rounded-full border border-black/15 bg-white text-black/70 transition hover:border-black hover:text-black"
+                      >
+                        −
+                      </button>
+                      <Input
+                        type="number"
+                        min={1}
+                        max={20}
+                        value={form.seeking_count ?? ""}
+                        placeholder="—"
+                        onChange={(e) => {
+                          const v = e.target.value
+                            ? Math.max(1, Math.min(20, Number(e.target.value)))
+                            : null;
+                          update("seeking_count", v);
+                        }}
+                        className="h-9 w-16 border-black/15 bg-white text-center tabular-nums"
                       />
+                      <button
+                        type="button"
+                        aria-label="Increase"
+                        onClick={() =>
+                          update("seeking_count", Math.min(20, (form.seeking_count ?? 0) + 1))
+                        }
+                        className="grid h-9 w-9 place-items-center rounded-full border border-black/15 bg-white text-black/70 transition hover:border-black hover:text-black"
+                      >
+                        +
+                      </button>
+                    </div>
+                  </div>
+                  {form.seeking_count && form.seeking_count > 0 ? (
+                    <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-black/[0.06] pt-4">
+                      <div className="text-[10px] uppercase tracking-[0.2em] text-black/45">
+                        Per person / month
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[18px] leading-none text-black/70">₹</span>
+                        <Input
+                          type="number"
+                          min={0}
+                          value={
+                            form.price_amount && form.seeking_count
+                              ? Math.round(form.price_amount / form.seeking_count)
+                              : ""
+                          }
+                          placeholder="0"
+                          onChange={(e) => {
+                            const per = e.target.value ? Number(e.target.value) : 0;
+                            update("price_amount", per * (form.seeking_count ?? 1));
+                          }}
+                          className="h-10 w-32 border-black/15 bg-white text-right text-[18px] font-medium tabular-nums"
+                        />
+                        {form.price_amount > 0 ? (
+                          <span className="text-[11.5px] text-black/45">
+                            × {form.seeking_count} = ₹
+                            {Number(form.price_amount).toLocaleString("en-IN")}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  ) : null}
+                </div>
+              )}
+            </Section>
+
+            <Section
+              active={activeStep === "location"}
+              id="location"
+              title="Location"
+              number="04"
+              hint="Drop a pin — we'll fill in the address for you."
+            >
+              <AddressPicker
+                value={
+                  form.latitude != null && form.longitude != null
+                    ? { lat: form.latitude, lng: form.longitude }
+                    : null
+                }
+                onChange={(coords, addr) => {
+                  setForm((f) => ({
+                    ...f,
+                    latitude: coords.lat,
+                    longitude: coords.lng,
+                    address_line: addr?.address_line || f.address_line,
+                    city: addr?.city || f.city,
+                    state: addr?.state ?? f.state,
+                    postal_code: addr?.postal_code ?? f.postal_code,
+                    country: addr?.country || f.country,
+                  }));
+                }}
+              />
+              <Field label="Address line">
+                <Input
+                  value={form.address_line}
+                  onChange={(e) => update("address_line", e.target.value)}
+                  placeholder="Flat 3B, Shivaji Nagar"
+                />
+              </Field>
+              <div className="grid gap-4 sm:grid-cols-3">
+                <Field label="City">
+                  <Input value={form.city} onChange={(e) => update("city", e.target.value)} />
+                </Field>
+                <Field label="State">
+                  <Input
+                    value={form.state ?? ""}
+                    onChange={(e) => update("state", e.target.value || null)}
+                  />
+                </Field>
+                <Field label="Postal code">
+                  <Input
+                    value={form.postal_code ?? ""}
+                    onChange={(e) => update("postal_code", e.target.value || null)}
+                  />
+                </Field>
+              </div>
+              <div className="border-t border-black/[0.08] pt-6">
+                <div className="mb-4 flex items-start justify-between gap-3">
+                  <div>
+                    <p className="text-[10px] font-medium uppercase tracking-[0.2em] text-black/45">
+                      Nearby · recommended
+                    </p>
+                    <h4 className="mt-1.5 text-[16px] font-medium leading-snug text-black">
+                      Near to
+                    </h4>
+                    <p className="mt-1 max-w-[52ch] text-[12.5px] leading-relaxed text-black/55">
+                      Tag colleges, metro stops, parks — seekers filter by these.
+                    </p>
+                  </div>
+                  <span className="shrink-0 text-[11px] tabular-nums text-black/45">
+                    {form.nearby.length}/5
+                  </span>
+                </div>
+                <PlaceAutocomplete
+                  value={nearbyQuery}
+                  onChange={setNearbyQuery}
+                  onPick={(p) => {
+                    setForm((f) => {
+                      const exists = f.nearby.some(
+                        (n) => n.label.toLowerCase() === p.label.toLowerCase(),
+                      );
+                      if (exists || f.nearby.length >= 5) return f;
+                      return {
+                        ...f,
+                        nearby: [
+                          ...f.nearby,
+                          { label: p.label, lat: p.lat ?? null, lng: p.lng ?? null },
+                        ],
+                      };
+                    });
+                    setNearbyQuery("");
+                  }}
+                  placeholder="Search a college, metro, café, park…"
+                  center={
+                    form.latitude != null && form.longitude != null
+                      ? { lat: form.latitude, lng: form.longitude }
+                      : null
+                  }
+                  radiusKm={2}
+                />
+                {form.nearby.length === 0 ? (
+                  <div className="mt-3 flex flex-wrap items-center gap-1.5">
+                    <span className="text-[11px] text-black/40">Try</span>
+                    {["college", "metro station", "IT park", "hospital", "mall"].map((s) => (
+                      <button
+                        key={s}
+                        type="button"
+                        onClick={() => setNearbyQuery(s)}
+                        className="rounded-full border border-black/12 bg-white px-2.5 py-0.5 text-[11px] text-black/60 transition hover:border-black hover:text-black"
+                      >
+                        {s}
+                      </button>
                     ))}
                   </div>
-                </SortableContext>
-              </DndContext>
-            </>
-          )}
-        </Section>
+                ) : (
+                  <div className="mt-3 flex flex-wrap gap-2">
+                    {form.nearby.map((n, i) => (
+                      <span
+                        key={`${n.label}-${i}`}
+                        className="inline-flex items-center gap-1.5 rounded-full border border-black/12 bg-white py-1 pl-2.5 pr-1 text-[12px] text-black"
+                      >
+                        <MapPin className="h-3 w-3 text-black/40" />
+                        {n.label}
+                        <button
+                          type="button"
+                          aria-label={`Remove ${n.label}`}
+                          onClick={() =>
+                            setForm((f) => ({ ...f, nearby: f.nearby.filter((_, j) => j !== i) }))
+                          }
+                          className="grid h-5 w-5 place-items-center rounded-full text-black/40 transition hover:bg-black/[0.06] hover:text-black"
+                        >
+                          <XIcon className="h-3 w-3" />
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </Section>
 
-        <Section active={activeStep==="contact"} id="contact" title="Contact" number="06" hint="How buyers or tenants reach you.">
-          <div className="grid gap-4 sm:grid-cols-2">
-            <Field label="Contact name">
-              <Input value={form.contact_name ?? ""} onChange={(e) => update("contact_name", e.target.value || null)} />
-            </Field>
-            <Field label="Phone number">
-              <Input value={form.contact_phone ?? ""} onChange={(e) => update("contact_phone", e.target.value || null)} placeholder="+91 …" />
-            </Field>
-          </div>
-        </Section>
+            <Section
+              active={activeStep === "photos"}
+              id="photos"
+              title="Photos"
+              number="05"
+              hint="Drag to reorder. First photo becomes the cover. Up to 8MB each."
+            >
+              <div
+                className="flex flex-col items-center justify-center rounded-xl border border-dashed border-black/15 bg-white p-8 text-center transition hover:border-black/40 sm:p-12"
+                onDragOver={(e) => e.preventDefault()}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  handleFiles(e.dataTransfer.files);
+                }}
+              >
+                <ImageIcon className="mb-3 h-5 w-5 text-black/30" strokeWidth={1.5} />
+                <p className="text-[13px] text-black/70">Drop images here, or</p>
+                <input
+                  ref={fileRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => handleFiles(e.target.files)}
+                />
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => fileRef.current?.click()}
+                  className="mt-2 inline-flex items-center gap-1.5 text-[13px] font-medium text-black underline underline-offset-4 decoration-black/25 hover:decoration-black"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="h-3.5 w-3.5 animate-spin" /> Uploading…
+                    </>
+                  ) : (
+                    <>
+                      <Upload className="h-3.5 w-3.5" /> browse from your device
+                    </>
+                  )}
+                </button>
+                <p className="mt-3 text-[11px] text-black/40">JPG · PNG · WebP · up to 8MB each</p>
+              </div>
+
+              {photos.length > 0 && (
+                <>
+                  <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-y border-black/[0.08] py-3">
+                    <div className="flex items-center gap-2 text-[12px] text-black/60">
+                      <Sparkles className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      Have AI draft your title, description & amenities from these photos.
+                    </div>
+                    <button
+                      type="button"
+                      onClick={runAiAutofill}
+                      disabled={aiLoading || uploading}
+                      className="inline-flex items-center gap-1.5 text-[12px] font-medium text-black underline underline-offset-4 decoration-black/25 transition hover:decoration-black disabled:opacity-50"
+                    >
+                      {aiLoading ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <Sparkles className="h-3 w-3" />
+                      )}
+                      {aiLoading ? "Reading photos…" : "Autofill with AI"}
+                    </button>
+                  </div>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleDragEnd}
+                  >
+                    <SortableContext items={photos.map((p) => p.id)} strategy={rectSortingStrategy}>
+                      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                        {photos.map((p) => (
+                          <SortablePhoto
+                            key={p.id}
+                            photo={p}
+                            isCover={coverUrl === p.url}
+                            onSetCover={() => setCover(p)}
+                            onRemove={() => removePhoto(p)}
+                          />
+                        ))}
+                      </div>
+                    </SortableContext>
+                  </DndContext>
+                </>
+              )}
+            </Section>
+
+            <Section
+              active={activeStep === "contact"}
+              id="contact"
+              title="Contact"
+              number="06"
+              hint="How buyers or tenants reach you."
+            >
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Contact name">
+                  <Input
+                    value={form.contact_name ?? ""}
+                    onChange={(e) => update("contact_name", e.target.value || null)}
+                  />
+                </Field>
+                <Field label="Phone number">
+                  <Input
+                    value={form.contact_phone ?? ""}
+                    onChange={(e) => update("contact_phone", e.target.value || null)}
+                    placeholder="+91 …"
+                  />
+                </Field>
+              </div>
+            </Section>
           </div>
 
           {/* Step navigation */}
@@ -846,14 +1080,25 @@ export function ListingForm({ userId, listingId, initial, initialPhotos = [] }: 
 
           <div className="h-16 lg:h-0" />
         </div>
-
       </div>
-
     </div>
   );
 }
 
-function Section({ id, title, hint, children, active }: { id: string; title: string; number?: string; hint?: string; children: React.ReactNode; active?: boolean }) {
+function Section({
+  id,
+  title,
+  hint,
+  children,
+  active,
+}: {
+  id: string;
+  title: string;
+  number?: string;
+  hint?: string;
+  children: React.ReactNode;
+  active?: boolean;
+}) {
   if (active === false) return null;
   return (
     <section id={id} className="scroll-mt-8">
@@ -861,7 +1106,11 @@ function Section({ id, title, hint, children, active }: { id: string; title: str
         <h2 className="text-[34px] font-medium leading-[1.05] tracking-tight text-black sm:text-[44px] lg:text-[52px]">
           {title}
         </h2>
-        {hint && <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-black/50 sm:text-[15px]">{hint}</p>}
+        {hint && (
+          <p className="mt-3 max-w-xl text-[14px] leading-relaxed text-black/50 sm:text-[15px]">
+            {hint}
+          </p>
+        )}
       </header>
       <div className="space-y-7">{children}</div>
     </section>
@@ -879,7 +1128,13 @@ function Field({ label, children }: { label: string; children: React.ReactNode }
   );
 }
 
-function AutosaveIndicator({ savedAt, restoredAt }: { savedAt: number | null; restoredAt: number | null }) {
+function AutosaveIndicator({
+  savedAt,
+  restoredAt,
+}: {
+  savedAt: number | null;
+  restoredAt: number | null;
+}) {
   const [, tick] = useState(0);
   useEffect(() => {
     const t = setInterval(() => tick((n) => n + 1), 15_000);
@@ -917,14 +1172,20 @@ function SortablePhoto({
   onSetCover: () => void;
   onRemove: () => void;
 }) {
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: photo.id });
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: photo.id,
+  });
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
     opacity: isDragging ? 0.6 : 1,
   };
   return (
-    <div ref={setNodeRef} style={style} className="group relative overflow-hidden rounded-xl border border-border bg-muted">
+    <div
+      ref={setNodeRef}
+      style={style}
+      className="group relative overflow-hidden rounded-xl border border-border bg-muted"
+    >
       <img src={photo.url} alt="" className="aspect-square w-full object-cover" draggable={false} />
       {isCover && <Badge className="absolute left-2 top-2 bg-coral text-white">Cover</Badge>}
       <button
@@ -937,10 +1198,18 @@ function SortablePhoto({
         <GripVertical className="h-3.5 w-3.5" />
       </button>
       <div className="absolute inset-x-0 bottom-0 flex justify-between gap-1 bg-gradient-to-t from-black/70 to-transparent p-2 opacity-0 transition group-hover:opacity-100">
-        <button type="button" onClick={onSetCover} className="rounded-md bg-white/90 px-2 py-1 text-xs font-semibold text-ink hover:bg-white">
+        <button
+          type="button"
+          onClick={onSetCover}
+          className="rounded-md bg-white/90 px-2 py-1 text-xs font-semibold text-ink hover:bg-white"
+        >
           <Star className="mr-1 inline h-3 w-3" /> Cover
         </button>
-        <button type="button" onClick={onRemove} className="rounded-md bg-white/90 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-white">
+        <button
+          type="button"
+          onClick={onRemove}
+          className="rounded-md bg-white/90 px-2 py-1 text-xs font-semibold text-red-600 hover:bg-white"
+        >
           <Trash2 className="h-3 w-3" />
         </button>
       </div>

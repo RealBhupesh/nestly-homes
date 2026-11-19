@@ -58,10 +58,14 @@ export const getUnreadCount = createServerFn({ method: "GET" })
     return { count: total };
   });
 
+// Client-supplied listing/owner fields are accepted for backwards compatibility
+// but IGNORED: owner_id, owner_name, owner_phone, title and photo are always
+// derived server-side from the listings table so nobody can route a
+// conversation to an arbitrary user.
 const openSchema = z.object({
   listingId: z.string().min(1).max(200),
   listingTitle: z.string().max(300).optional(),
-  listingPhoto: z.string().url().max(2000).optional(),
+  listingPhoto: z.string().max(2000).optional(),
   ownerId: z.string().max(200).optional(),
   ownerName: z.string().max(200).optional(),
   ownerPhone: z.string().max(40).optional(),
@@ -71,29 +75,59 @@ export const openConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => openSchema.parse(input))
   .handler(async ({ data, context }) => {
+    const { getDbListing, getDisplayName } = await import("@/lib/notify.server");
+    const listing = await getDbListing(data.listingId);
+    if (!listing || (listing.status !== "published" && listing.owner_id !== context.userId)) {
+      throw new Error("This listing isn't accepting messages right now.");
+    }
+    if (listing.owner_id === context.userId) {
+      throw new Error("This is your own listing.");
+    }
+
     // upsert-like: return existing or create
     const { data: existing } = await context.supabase
       .from("conversations")
-      .select("id")
-      .eq("listing_id", data.listingId)
+      .select("id, owner_id")
+      .eq("listing_id", listing.id)
       .eq("seeker_id", context.userId)
       .maybeSingle();
-    if (existing) return { id: existing.id, created: false };
+    if (existing) {
+      if (existing.owner_id !== listing.owner_id) {
+        // Repair threads created before owner_id was derived server-side.
+        const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
+        await supabaseAdmin
+          .from("conversations")
+          .update({ owner_id: listing.owner_id })
+          .eq("id", existing.id);
+      }
+      return { id: existing.id, created: false };
+    }
 
+    const ownerName = listing.contact_name?.trim() || (await getDisplayName(listing.owner_id));
     const { data: row, error } = await context.supabase
       .from("conversations")
       .insert({
-        listing_id: data.listingId,
+        listing_id: listing.id,
         seeker_id: context.userId,
-        owner_id: data.ownerId ?? null,
-        listing_title: data.listingTitle ?? null,
-        listing_photo: data.listingPhoto ?? null,
-        owner_name: data.ownerName ?? null,
-        owner_phone: data.ownerPhone ?? null,
+        owner_id: listing.owner_id,
+        listing_title: listing.title,
+        listing_photo: listing.cover_photo_url,
+        owner_name: ownerName,
+        owner_phone: listing.contact_phone,
       })
       .select("id")
       .single();
-    if (error) throw new Error(error.message);
+    if (error) {
+      // Concurrent open from another tab: return the row that won.
+      const { data: again } = await context.supabase
+        .from("conversations")
+        .select("id")
+        .eq("listing_id", listing.id)
+        .eq("seeker_id", context.userId)
+        .maybeSingle();
+      if (again) return { id: again.id, created: false };
+      throw new Error(error.message);
+    }
     return { id: row.id, created: true };
   });
 
@@ -113,27 +147,44 @@ export const listMessages = createServerFn({ method: "GET" })
     return (rows ?? []) as MessageRow[];
   });
 
+// Users can only send plain text. 'system' / 'booking' messages are written
+// by the server (service role) — see notify.server.ts.
 const sendSchema = z.object({
   conversationId: z.string().uuid(),
   body: z.string().trim().min(1).max(4000),
-  kind: z.enum(["text", "system", "booking"]).default("text"),
+  kind: z.literal("text").default("text"),
 });
 
 export const sendMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
   .inputValidator((input: unknown) => sendSchema.parse(input))
   .handler(async ({ data, context }) => {
+    const { enforceRateLimit } = await import("@/lib/rate-limit");
+    await enforceRateLimit(
+      `msg:${context.userId}`,
+      30,
+      60,
+      "You're sending messages too quickly. Please slow down.",
+    );
+
     const { data: row, error } = await context.supabase
       .from("messages")
       .insert({
         conversation_id: data.conversationId,
         sender_id: context.userId,
         body: data.body,
-        kind: data.kind,
+        kind: "text",
       })
       .select("id, conversation_id, sender_id, body, kind, read_at, created_at")
       .single();
     if (error) throw new Error(error.message);
+
+    const { notifyNewMessage } = await import("@/lib/notify.server");
+    await notifyNewMessage({
+      conversationId: data.conversationId,
+      senderId: context.userId,
+      body: data.body,
+    });
     return row as MessageRow;
   });
 
@@ -180,7 +231,8 @@ export const setPhoneRevealed = createServerFn({ method: "POST" })
       .select("owner_id")
       .eq("id", data.conversationId)
       .maybeSingle();
-    if (!conv || conv.owner_id !== context.userId) throw new Error("Only the owner can reveal contact");
+    if (!conv || conv.owner_id !== context.userId)
+      throw new Error("Only the owner can reveal contact");
     const { error } = await context.supabase
       .from("conversations")
       .update({ phone_revealed: data.revealed })

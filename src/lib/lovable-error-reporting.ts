@@ -1,3 +1,5 @@
+import { captureError } from "./monitoring";
+
 type LovableErrorOptions = {
   mechanism?: "manual" | "onerror" | "unhandledrejection" | "react_error_boundary";
   handled?: boolean;
@@ -25,6 +27,8 @@ declare global {
 
 export function reportLovableError(error: unknown, context: Record<string, unknown> = {}) {
   if (typeof window === "undefined") return;
+  // Production monitoring (Sentry) — no-op unless VITE_SENTRY_DSN is set.
+  captureError(error, { route: window.location.pathname, ...context });
   window.__lovableEvents?.captureException?.(
     error,
     {

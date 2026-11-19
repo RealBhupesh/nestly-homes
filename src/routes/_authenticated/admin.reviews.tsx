@@ -42,10 +42,18 @@ function AdminReviews() {
     }
   }
 
-  const filtered = useMemo(() => rows?.filter((r) => r.rating >= minRating) ?? null, [rows, minRating]);
+  const filtered = useMemo(
+    () => rows?.filter((r) => r.rating >= minRating) ?? null,
+    [rows, minRating],
+  );
 
   function toggle(id: string) {
-    setSelected((s) => { const n = new Set(s); n.has(id) ? n.delete(id) : n.add(id); return n; });
+    setSelected((s) => {
+      const n = new Set(s);
+      if (n.has(id)) n.delete(id);
+      else n.add(id);
+      return n;
+    });
   }
   async function bulkRemove() {
     const ids = Array.from(selected);
@@ -58,7 +66,11 @@ function AdminReviews() {
       setRows((r) => r?.filter((x) => !s.has(x.id)) ?? null);
       setSelected(new Set());
       toast.success(`Deleted ${ids.length}`);
-    } catch (e: any) { toast.error(e.message); } finally { setBusy(false); }
+    } catch (e: any) {
+      toast.error(e.message);
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -90,7 +102,10 @@ function AdminReviews() {
 
       <ul className="grid gap-3">
         {filtered?.map((r) => (
-          <li key={r.id} className={`rounded-2xl border p-4 ${selected.has(r.id) ? "border-ink bg-muted/40" : "border-border/70 bg-card"}`}>
+          <li
+            key={r.id}
+            className={`rounded-2xl border p-4 ${selected.has(r.id) ? "border-ink bg-muted/40" : "border-border/70 bg-card"}`}
+          >
             <div className="flex items-start justify-between gap-4">
               <input
                 type="checkbox"
@@ -136,7 +151,10 @@ function AdminReviews() {
           style={{ paddingBottom: "calc(0.5rem + env(safe-area-inset-bottom))" }}
         >
           <div className="flex items-center gap-2 rounded-full border border-border/70 bg-card/95 px-3 py-2 shadow-xl backdrop-blur">
-            <button onClick={() => setSelected(new Set())} className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted">
+            <button
+              onClick={() => setSelected(new Set())}
+              className="inline-flex h-8 w-8 items-center justify-center rounded-full hover:bg-muted"
+            >
               <X className="h-4 w-4" />
             </button>
             <span className="px-2 text-[13px] font-medium text-ink">{selected.size} selected</span>

@@ -21,7 +21,10 @@ export const Route = createFileRoute("/_authenticated/dashboard/tours")({
   head: () => ({
     meta: [
       { title: "Tours · Nestly" },
-      { name: "description", content: "Manage viewing availability and tour requests for your Nestly listings." },
+      {
+        name: "description",
+        content: "Manage viewing availability and tour requests for your Nestly listings.",
+      },
     ],
   }),
 });
@@ -101,8 +104,14 @@ function ToursPage() {
       });
   }, [user?.id]);
 
-  const incoming = useMemo(() => bookings.filter((b) => b.owner_id === user?.id), [bookings, user?.id]);
-  const mine = useMemo(() => bookings.filter((b) => b.seeker_id === user?.id), [bookings, user?.id]);
+  const incoming = useMemo(
+    () => bookings.filter((b) => b.owner_id === user?.id),
+    [bookings, user?.id],
+  );
+  const mine = useMemo(
+    () => bookings.filter((b) => b.seeker_id === user?.id),
+    [bookings, user?.id],
+  );
   const titleFor = (id: string) => listings.find((l) => l.id === id)?.title ?? "Listing";
 
   async function act(id: string, status: "confirmed" | "declined" | "completed" | "cancelled") {
@@ -175,8 +184,12 @@ function ToursPage() {
   return (
     <div className="mx-auto max-w-[980px] px-4 py-8 sm:px-6 lg:py-12">
       <header className="mb-6">
-        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">Scheduling</p>
-        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">Tours</h1>
+        <p className="text-[11px] font-semibold uppercase tracking-[0.18em] text-ink/45">
+          Scheduling
+        </p>
+        <h1 className="mt-1 font-display text-3xl font-semibold tracking-tight text-ink sm:text-4xl">
+          Tours
+        </h1>
         <p className="mt-2 max-w-lg text-[14px] text-ink/60">
           Publish viewing windows once — seekers book themselves, and you approve with a tap.
         </p>
@@ -223,10 +236,14 @@ function ToursPage() {
                         <p className="mt-0.5 text-[13px] text-ink/60">
                           {when(b)} · {b.party_size} {b.party_size === 1 ? "person" : "people"}
                         </p>
-                        {b.seeker_phone && <p className="mt-0.5 text-[12.5px] text-ink/55">{b.seeker_phone}</p>}
+                        {b.seeker_phone && (
+                          <p className="mt-0.5 text-[12.5px] text-ink/55">{b.seeker_phone}</p>
+                        )}
                         {b.note && <p className="mt-2 text-[13px] text-ink/70">“{b.note}”</p>}
                       </div>
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[b.status]}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[b.status]}`}
+                      >
                         {b.status}
                       </span>
                     </div>
@@ -253,10 +270,19 @@ function ToursPage() {
                       )}
                       {b.status === "confirmed" && (
                         <>
-                          <button type="button" onClick={() => calendarFor(b)} className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]">
+                          <button
+                            type="button"
+                            onClick={() => calendarFor(b)}
+                            className="inline-flex h-9 items-center gap-1.5 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]"
+                          >
                             <CalendarPlus className="h-3.5 w-3.5" /> Add to calendar
                           </button>
-                          <button type="button" disabled={busyId === b.id} onClick={() => act(b.id, "completed")} className="inline-flex h-9 items-center rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]">
+                          <button
+                            type="button"
+                            disabled={busyId === b.id}
+                            onClick={() => act(b.id, "completed")}
+                            className="inline-flex h-9 items-center rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]"
+                          >
                             Mark visited
                           </button>
                         </>
@@ -279,22 +305,39 @@ function ToursPage() {
             ) : (
               <ul className="space-y-3">
                 {mine.map((b) => (
-                  <li key={b.id} className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-card p-4">
+                  <li
+                    key={b.id}
+                    className="flex flex-wrap items-center justify-between gap-3 rounded-2xl border border-ink/[0.08] bg-card p-4"
+                  >
                     <div className="min-w-0">
-                      <p className="truncate text-[14px] font-semibold text-ink">{b.listing_title ?? "Listing"}</p>
+                      <p className="truncate text-[14px] font-semibold text-ink">
+                        {b.listing_title ?? "Listing"}
+                      </p>
                       <p className="mt-0.5 text-[13px] text-ink/60">{when(b)}</p>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[b.status]}`}>
+                      <span
+                        className={`rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider ${STATUS_STYLE[b.status]}`}
+                      >
                         {b.status}
                       </span>
                       {b.status === "confirmed" && (
-                        <button type="button" onClick={() => calendarFor(b)} aria-label="Add to calendar" className="grid h-9 w-9 place-items-center rounded-full border border-ink/12 text-ink hover:bg-ink/[0.04]">
+                        <button
+                          type="button"
+                          onClick={() => calendarFor(b)}
+                          aria-label="Add to calendar"
+                          className="grid h-9 w-9 place-items-center rounded-full border border-ink/12 text-ink hover:bg-ink/[0.04]"
+                        >
                           <CalendarPlus className="h-4 w-4" />
                         </button>
                       )}
                       {(b.status === "requested" || b.status === "confirmed") && (
-                        <button type="button" disabled={busyId === b.id} onClick={() => act(b.id, "cancelled")} className="h-9 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]">
+                        <button
+                          type="button"
+                          disabled={busyId === b.id}
+                          onClick={() => act(b.id, "cancelled")}
+                          className="h-9 rounded-full border border-ink/12 px-3.5 text-[12.5px] font-medium text-ink hover:bg-ink/[0.04]"
+                        >
                           Cancel
                         </button>
                       )}
@@ -307,10 +350,15 @@ function ToursPage() {
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-[minmax(0,360px)_minmax(0,1fr)]">
-          <form onSubmit={saveSlots} className="h-fit space-y-4 rounded-2xl border border-ink/[0.08] bg-card p-5">
+          <form
+            onSubmit={saveSlots}
+            className="h-fit space-y-4 rounded-2xl border border-ink/[0.08] bg-card p-5"
+          >
             <h2 className="text-[14px] font-semibold text-ink">Add viewing windows</h2>
             <label className="block">
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Listing</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                Listing
+              </span>
               <select
                 value={listingId}
                 onChange={(e) => setListingId(e.target.value)}
@@ -325,7 +373,9 @@ function ToursPage() {
               </select>
             </label>
             <label className="block">
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Date</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                Date
+              </span>
               <input
                 type="date"
                 value={date}
@@ -334,36 +384,53 @@ function ToursPage() {
               />
             </label>
             <div>
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Times (30 min each)</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                Times (30 min each)
+              </span>
               <div className="mt-1 space-y-2">
                 {times.map((t, i) => (
                   <div key={i} className="flex gap-2">
                     <input
                       type="time"
                       value={t}
-                      onChange={(e) => setTimes((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))}
+                      onChange={(e) =>
+                        setTimes((prev) => prev.map((v, j) => (j === i ? e.target.value : v)))
+                      }
                       className="h-11 flex-1 rounded-xl border border-ink/10 bg-background px-3 text-[14px] text-ink outline-none focus:border-ink/40"
                     />
                     {times.length > 1 && (
-                      <button type="button" aria-label="Remove time" onClick={() => setTimes((p) => p.filter((_, j) => j !== i))} className="grid h-11 w-11 place-items-center rounded-xl border border-ink/10 text-ink/50 hover:text-ink">
+                      <button
+                        type="button"
+                        aria-label="Remove time"
+                        onClick={() => setTimes((p) => p.filter((_, j) => j !== i))}
+                        className="grid h-11 w-11 place-items-center rounded-xl border border-ink/10 text-ink/50 hover:text-ink"
+                      >
                         <X className="h-4 w-4" />
                       </button>
                     )}
                   </div>
                 ))}
               </div>
-              <button type="button" onClick={() => setTimes((p) => [...p, "16:00"])} className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-ink/65 hover:text-ink">
+              <button
+                type="button"
+                onClick={() => setTimes((p) => [...p, "16:00"])}
+                className="mt-2 inline-flex items-center gap-1.5 text-[12.5px] font-medium text-ink/65 hover:text-ink"
+              >
                 <Plus className="h-3.5 w-3.5" /> Add another time
               </button>
             </div>
             <label className="block">
-              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">Capacity per slot</span>
+              <span className="text-[12px] font-semibold uppercase tracking-wider text-ink/45">
+                Capacity per slot
+              </span>
               <input
                 type="number"
                 min={1}
                 max={20}
                 value={capacity}
-                onChange={(e) => setCapacity(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
+                onChange={(e) =>
+                  setCapacity(Math.max(1, Math.min(20, Number(e.target.value) || 1)))
+                }
                 className="mt-1 h-11 w-full rounded-xl border border-ink/10 bg-background px-3 text-[14px] text-ink outline-none focus:border-ink/40"
               />
             </label>

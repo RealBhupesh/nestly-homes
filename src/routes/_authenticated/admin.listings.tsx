@@ -131,7 +131,9 @@ function AdminListings() {
     if (sortKey === k) setSortDir((d) => (d === "asc" ? "desc" : "asc"));
     else {
       setSortKey(k);
-      setSortDir(k === "updated_at" || k === "price_amount" || k === "is_featured" ? "desc" : "asc");
+      setSortDir(
+        k === "updated_at" || k === "price_amount" || k === "is_featured" ? "desc" : "asc",
+      );
     }
   }
 
@@ -219,7 +221,9 @@ function AdminListings() {
     setBusy(true);
     try {
       await bulkSetListingFeatured({ data: { ids, featured: next } });
-      setRows((r) => r?.map((x: any) => (selected.has(x.id) ? { ...x, is_featured: next } : x)) ?? null);
+      setRows(
+        (r) => r?.map((x: any) => (selected.has(x.id) ? { ...x, is_featured: next } : x)) ?? null,
+      );
       toast.success(`${next ? "Featured" : "Unfeatured"} ${ids.length}`);
       setSelected(new Set());
     } catch (e: any) {
@@ -268,7 +272,9 @@ function AdminListings() {
       <header className="flex flex-col gap-3 sm:flex-row sm:flex-wrap sm:items-end sm:justify-between sm:gap-4">
         <div className="min-w-0">
           <p className="text-[11px] uppercase tracking-[0.2em] text-ink/45">Moderation</p>
-          <h1 className="mt-1 text-2xl font-medium tracking-tight text-ink sm:text-3xl">All listings</h1>
+          <h1 className="mt-1 text-2xl font-medium tracking-tight text-ink sm:text-3xl">
+            All listings
+          </h1>
           <p className="mt-1 text-[13px] text-ink/55">
             {filtered ? `${filtered.length} of ${rows?.length ?? 0}` : "Loading…"}
           </p>
@@ -292,8 +298,18 @@ function AdminListings() {
                     featured: r.is_featured,
                     updated_at: r.updated_at,
                   })),
-                  ["id", "title", "status", "mode", "property_type", "city", "price", "featured", "updated_at"],
-                )
+                  [
+                    "id",
+                    "title",
+                    "status",
+                    "mode",
+                    "property_type",
+                    "city",
+                    "price",
+                    "featured",
+                    "updated_at",
+                  ],
+                ),
               )
             }
             className="inline-flex h-9 items-center gap-1.5 rounded-full border border-border/70 px-3 text-[12px] text-ink hover:bg-muted"
@@ -369,7 +385,9 @@ function AdminListings() {
         {showFilters && (
           <div className="grid grid-cols-1 gap-3 rounded-2xl border border-border/70 bg-card p-4 sm:grid-cols-2 lg:grid-cols-5">
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">Mode</label>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">
+                Mode
+              </label>
               <select
                 value={mode}
                 onChange={(e) => setMode(e.target.value as any)}
@@ -381,7 +399,9 @@ function AdminListings() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">Property type</label>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">
+                Property type
+              </label>
               <select
                 value={propType}
                 onChange={(e) => setPropType(e.target.value)}
@@ -396,7 +416,9 @@ function AdminListings() {
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">Min price (₹)</label>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">
+                Min price (₹)
+              </label>
               <input
                 inputMode="numeric"
                 value={minPrice}
@@ -406,7 +428,9 @@ function AdminListings() {
               />
             </div>
             <div>
-              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">Max price (₹)</label>
+              <label className="mb-1 block text-[11px] uppercase tracking-wider text-ink/50">
+                Max price (₹)
+              </label>
               <input
                 inputMode="numeric"
                 value={maxPrice}
@@ -541,12 +565,50 @@ function AdminListings() {
                   className="h-4 w-4 accent-ink"
                 />
               </th>
-              <SortableTh label="Listing" k="title" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortableTh label="Location" k="city" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortableTh label="Price" k="price_amount" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="right" />
-              <SortableTh label="Status" k="status" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
-              <SortableTh label="Feat." k="is_featured" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} align="center" />
-              <SortableTh label="Updated" k="updated_at" sortKey={sortKey} sortDir={sortDir} onClick={toggleSort} />
+              <SortableTh
+                label="Listing"
+                k="title"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
+              <SortableTh
+                label="Location"
+                k="city"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
+              <SortableTh
+                label="Price"
+                k="price_amount"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+                align="right"
+              />
+              <SortableTh
+                label="Status"
+                k="status"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
+              <SortableTh
+                label="Feat."
+                k="is_featured"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+                align="center"
+              />
+              <SortableTh
+                label="Updated"
+                k="updated_at"
+                sortKey={sortKey}
+                sortDir={sortDir}
+                onClick={toggleSort}
+              />
               <th className="px-4 py-3" />
             </tr>
           </thead>
@@ -568,7 +630,10 @@ function AdminListings() {
             {filtered?.map((r: any) => {
               const meta = STATUS_META[r.status] ?? STATUS_META.draft;
               return (
-                <tr key={r.id} className={`align-middle ${selected.has(r.id) ? "bg-muted/50" : ""}`}>
+                <tr
+                  key={r.id}
+                  className={`align-middle ${selected.has(r.id) ? "bg-muted/50" : ""}`}
+                >
                   <td className="px-4 py-3">
                     <input
                       type="checkbox"
@@ -582,7 +647,11 @@ function AdminListings() {
                     <div className="flex items-center gap-3">
                       <div className="h-10 w-14 shrink-0 overflow-hidden rounded-md bg-muted">
                         {r.cover_photo_url && (
-                          <img src={r.cover_photo_url} alt="" className="h-full w-full object-cover" />
+                          <img
+                            src={r.cover_photo_url}
+                            alt=""
+                            className="h-full w-full object-cover"
+                          />
                         )}
                       </div>
                       <div className="min-w-0">

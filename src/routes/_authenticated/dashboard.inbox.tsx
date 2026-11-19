@@ -67,12 +67,16 @@ function InboxPage() {
         if (!alive) return;
         setConversations(rows);
         if (!activeId && rows.length) setActiveId(rows[0].id);
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     load();
     const ch = supabase
       .channel("inbox-conversations")
-      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () => load())
+      .on("postgres_changes", { event: "*", schema: "public", table: "conversations" }, () =>
+        load(),
+      )
       .subscribe();
     return () => {
       alive = false;
@@ -83,7 +87,10 @@ function InboxPage() {
 
   // Messages for active conversation + realtime
   useEffect(() => {
-    if (!activeId) { setMessages([]); return; }
+    if (!activeId) {
+      setMessages([]);
+      return;
+    }
     let alive = true;
     async function load() {
       try {
@@ -91,14 +98,21 @@ function InboxPage() {
         if (!alive) return;
         setMessages(rows);
         await markRead({ data: { conversationId: activeId! } });
-      } catch { /* ignore */ }
+      } catch {
+        /* ignore */
+      }
     }
     load();
     const ch = supabase
       .channel(`inbox-msgs-${activeId}`)
       .on(
         "postgres_changes",
-        { event: "INSERT", schema: "public", table: "messages", filter: `conversation_id=eq.${activeId}` },
+        {
+          event: "INSERT",
+          schema: "public",
+          table: "messages",
+          filter: `conversation_id=eq.${activeId}`,
+        },
         (payload) => {
           const m = payload.new as MessageRow;
           setMessages((prev) => (prev.some((x) => x.id === m.id) ? prev : [...prev, m]));
@@ -117,9 +131,12 @@ function InboxPage() {
     bottomRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [messages.length]);
 
-  const active = useMemo(() => conversations.find((c) => c.id === activeId) ?? null, [conversations, activeId]);
+  const active = useMemo(
+    () => conversations.find((c) => c.id === activeId) ?? null,
+    [conversations, activeId],
+  );
   const isOwnerSide = !!(active && user && active.owner_id === user.id);
-  const otherLabel = isOwnerSide ? "Seeker" : active?.owner_name ?? "Owner";
+  const otherLabel = isOwnerSide ? "Seeker" : (active?.owner_name ?? "Owner");
 
   async function handleSend(e: React.FormEvent) {
     e.preventDefault();
@@ -150,7 +167,10 @@ function InboxPage() {
   }
 
   if (loading) return <div className="p-8 text-ink/60">Loading…</div>;
-  if (!user) { navigate({ to: "/auth" }); return null; }
+  if (!user) {
+    navigate({ to: "/auth" });
+    return null;
+  }
 
   return (
     <div className="-mx-4 grid h-[calc(100dvh-4rem)] grid-cols-1 overflow-hidden border-y border-border/60 bg-card sm:mx-0 sm:rounded-2xl sm:border lg:grid-cols-[340px_1fr]">
@@ -183,7 +203,11 @@ function InboxPage() {
                     }`}
                   >
                     {c.listing_photo ? (
-                      <img src={c.listing_photo} alt="" className="h-11 w-11 shrink-0 rounded-lg object-cover" />
+                      <img
+                        src={c.listing_photo}
+                        alt=""
+                        className="h-11 w-11 shrink-0 rounded-lg object-cover"
+                      />
                     ) : (
                       <div className="h-11 w-11 shrink-0 rounded-lg bg-muted" />
                     )}
@@ -224,19 +248,36 @@ function InboxPage() {
                 className="rounded-full p-1.5 text-ink/60 hover:bg-muted lg:hidden"
                 aria-label="Back"
               >
-                <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2">
+                <svg
+                  viewBox="0 0 24 24"
+                  className="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M15 6l-6 6 6 6" strokeLinecap="round" strokeLinejoin="round" />
                 </svg>
               </button>
               {active.listing_photo && (
-                <img src={active.listing_photo} alt="" className="h-9 w-9 rounded-lg object-cover" />
+                <img
+                  src={active.listing_photo}
+                  alt=""
+                  className="h-9 w-9 rounded-lg object-cover"
+                />
               )}
               <div className="min-w-0 flex-1">
-                <p className="truncate text-[13.5px] font-semibold text-ink">{active.listing_title ?? "Listing"}</p>
+                <p className="truncate text-[13.5px] font-semibold text-ink">
+                  {active.listing_title ?? "Listing"}
+                </p>
                 <p className="text-[11.5px] text-ink/55">
                   {otherLabel}{" "}
                   {active.phone_revealed && active.owner_phone && !isOwnerSide && (
-                    <>· <a href={`tel:${active.owner_phone}`} className="text-teal hover:underline">{active.owner_phone}</a></>
+                    <>
+                      ·{" "}
+                      <a href={`tel:${active.owner_phone}`} className="text-teal hover:underline">
+                        {active.owner_phone}
+                      </a>
+                    </>
                   )}
                 </p>
               </div>
@@ -244,7 +285,9 @@ function InboxPage() {
                 <button
                   type="button"
                   onClick={async () => {
-                    await toggleReveal({ data: { conversationId: active.id, revealed: !active.phone_revealed } });
+                    await toggleReveal({
+                      data: { conversationId: active.id, revealed: !active.phone_revealed },
+                    });
                   }}
                   className={`rounded-full border px-3 py-1.5 text-[11.5px] font-medium transition ${
                     active.phone_revealed
@@ -262,7 +305,10 @@ function InboxPage() {
                 const mine = m.sender_id === user.id;
                 if (m.kind === "system" || m.kind === "booking") {
                   return (
-                    <div key={m.id} className="mx-auto max-w-md rounded-full bg-ink/[0.06] px-3 py-1 text-center text-[11.5px] text-ink/60">
+                    <div
+                      key={m.id}
+                      className="mx-auto max-w-md rounded-full bg-ink/[0.06] px-3 py-1 text-center text-[11.5px] text-ink/60"
+                    >
                       {m.body}
                     </div>
                   );
@@ -275,7 +321,9 @@ function InboxPage() {
                       }`}
                     >
                       <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                      <div className={`mt-0.5 text-right text-[10px] ${mine ? "text-cream/60" : "text-ink/40"}`}>
+                      <div
+                        className={`mt-0.5 text-right text-[10px] ${mine ? "text-cream/60" : "text-ink/40"}`}
+                      >
                         {formatRelative(m.created_at)}
                       </div>
                     </div>
@@ -285,12 +333,18 @@ function InboxPage() {
               <div ref={bottomRef} />
             </div>
 
-            <form onSubmit={handleSend} className="flex items-end gap-2 border-t border-border/60 bg-card p-3">
+            <form
+              onSubmit={handleSend}
+              className="flex items-end gap-2 border-t border-border/60 bg-card p-3"
+            >
               <textarea
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 onKeyDown={(e) => {
-                  if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); handleSend(e as unknown as React.FormEvent); }
+                  if (e.key === "Enter" && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSend(e as unknown as React.FormEvent);
+                  }
                 }}
                 rows={1}
                 placeholder="Write a message…"

@@ -11,7 +11,13 @@ import {
   type AlertFrequency,
   type SavedSearchRow,
 } from "@/lib/saved-searches.functions";
-import { LISTINGS } from "@/lib/listings-data";
+import { useQuery } from "@tanstack/react-query";
+import { searchListings } from "@/lib/public-listings.functions";
+import {
+  PROPERTY_TYPE_LABEL,
+  parsePropertyTypes,
+  searchParamsToFilters,
+} from "@/lib/listings-data";
 
 export const Route = createFileRoute("/_authenticated/dashboard/saved")({
   component: SavedPage,
@@ -26,12 +32,22 @@ function SavedPage() {
   const navigate = useNavigate();
 
   async function load() {
-    try { setRows(await list()); } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    try {
+      setRows(await list());
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
   }
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
 
   async function open(r: SavedSearchRow) {
-    try { await touch({ data: { id: r.id } }); } catch {}
+    try {
+      await touch({ data: { id: r.id } });
+    } catch {
+      // best-effort "last viewed" bump; navigate regardless
+    }
     navigate({ to: "/search", search: { ...r.params } as never });
   }
 
@@ -41,19 +57,29 @@ function SavedPage() {
       await del({ data: { id: r.id } });
       setRows((prev) => prev?.filter((x) => x.id !== r.id) ?? null);
       toast.success("Deleted");
-    } catch (e) { toast.error(e instanceof Error ? e.message : "Failed"); }
+    } catch (e) {
+      toast.error(e instanceof Error ? e.message : "Failed");
+    }
   }
 
   async function changeAlert(r: SavedSearchRow, frequency: AlertFrequency) {
     const prev = r.alert_frequency;
-    setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, alert_frequency: frequency } : x)) ?? null);
+    setRows(
+      (rs) => rs?.map((x) => (x.id === r.id ? { ...x, alert_frequency: frequency } : x)) ?? null,
+    );
     try {
       await setAlert({ data: { id: r.id, frequency } });
       toast.success(
-        frequency === "off" ? "Alerts off" : frequency === "instant" ? "Instant alerts on" : "Daily digest on",
+        frequency === "off"
+          ? "Alerts off"
+          : frequency === "instant"
+            ? "Instant alerts on"
+            : "Daily digest on",
       );
     } catch (e) {
-      setRows((rs) => rs?.map((x) => (x.id === r.id ? { ...x, alert_frequency: prev } : x)) ?? null);
+      setRows(
+        (rs) => rs?.map((x) => (x.id === r.id ? { ...x, alert_frequency: prev } : x)) ?? null,
+      );
       toast.error(e instanceof Error ? e.message : "Failed");
     }
   }
@@ -62,9 +88,12 @@ function SavedPage() {
     <div className="space-y-8 sm:space-y-12">
       <div className="border-b border-border/70 pb-6 sm:pb-8">
         <p className="text-[11px] tracking-wide text-ink/50">Watchlist</p>
-        <h1 className="mt-2 text-2xl font-medium tracking-tight text-ink sm:text-4xl">Saved searches</h1>
+        <h1 className="mt-2 text-2xl font-medium tracking-tight text-ink sm:text-4xl">
+          Saved searches
+        </h1>
         <p className="mt-2 max-w-lg text-[13px] text-ink/55">
-          Pin the filter combos you keep re-typing. We'll flag any homes that appeared since you last checked.
+          Pin the filter combos you keep re-typing. We'll flag any homes that appeared since you
+          last checked.
         </p>
       </div>
 
@@ -88,8 +117,6 @@ function SavedPage() {
 
       <ul className="divide-y divide-border/70">
         {rows?.map((r) => {
-          const newCount = countNewSince(r);
-          const total = countMatches(r);
           return (
             <li key={r.id} className="group py-5">
               <div className="flex items-start gap-4">
@@ -99,14 +126,10 @@ function SavedPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <h3 className="truncate text-[15px] font-medium text-ink">{r.name}</h3>
-                    {newCount > 0 && (
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
-                        {newCount} new
-                      </span>
-                    )}
+                    <NewBadge r={r} />
                   </div>
                   <p className="mt-1 truncate text-[12px] text-ink/55">
-                    {summarize(r)} · {total} match{total === 1 ? "" : "es"}
+                    {summarize(r)} · <MatchCount r={r} />
                   </p>
                   <div className="mt-3 flex flex-wrap items-center gap-2">
                     <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-ink/40">
@@ -119,7 +142,9 @@ function SavedPage() {
                           type="button"
                           onClick={() => changeAlert(r, f)}
                           className={`rounded-full px-2.5 py-1 text-[11px] font-medium capitalize transition ${
-                            r.alert_frequency === f ? "bg-ink text-background" : "text-ink/55 hover:text-ink"
+                            r.alert_frequency === f
+                              ? "bg-ink text-background"
+                              : "text-ink/55 hover:text-ink"
                           }`}
                         >
                           {f}
@@ -160,38 +185,48 @@ function SavedPage() {
   );
 }
 
-function matches(l: typeof LISTINGS[number], p: SavedSearchRow["params"]): boolean {
-  const mode = p.mode ?? "rent";
-  if (mode === "rent" && l.listingType !== "rent") return false;
-  if (mode === "sale" && l.listingType !== "sale") return false;
-  if (p.type && p.type !== "any" && l.propertyType !== p.type) return false;
-  if (p.furn && p.furn !== "any" && l.furnished !== p.furn) return false;
-  if (p.max && p.max > 0 && l.price > p.max) return false;
-  if (p.q) {
-    const hay = `${l.title} ${l.neighborhood} ${l.landmark}`.toLowerCase();
-    if (!hay.includes(p.q.toLowerCase())) return false;
-  }
-  return true;
+function useMatchCount(r: SavedSearchRow, postedAfter?: string) {
+  const search = useServerFn(searchListings);
+  return useQuery({
+    queryKey: ["saved-search-count", r.id, JSON.stringify(r.params), postedAfter ?? null],
+    queryFn: async () => {
+      const filters = searchParamsToFilters(r.params);
+      const res = await search({ data: { ...filters, postedAfter, limit: 1, offset: 0 } });
+      return res.total;
+    },
+    staleTime: 60_000,
+    retry: 1,
+  });
 }
 
-function countMatches(r: SavedSearchRow): number {
-  return LISTINGS.filter((l) => matches(l, r.params)).length;
+function MatchCount({ r }: { r: SavedSearchRow }) {
+  const { data, isLoading, isError } = useMatchCount(r);
+  if (isLoading) return <Loader2 className="inline h-3 w-3 animate-spin align-[-2px]" />;
+  if (isError || data == null) return <span>match count unavailable</span>;
+  return (
+    <span>
+      {data} match{data === 1 ? "" : "es"}
+    </span>
+  );
 }
 
-function countNewSince(r: SavedSearchRow): number {
-  const daysSince = Math.max(0, Math.floor((Date.now() - new Date(r.last_seen_at).getTime()) / 86_400_000));
-  return LISTINGS.filter((l) => matches(l, r.params) && l.postedDaysAgo <= daysSince).length;
+function NewBadge({ r }: { r: SavedSearchRow }) {
+  const { data } = useMatchCount(r, new Date(r.last_seen_at).toISOString());
+  if (!data) return null;
+  return (
+    <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-primary">
+      {data} new
+    </span>
+  );
 }
 
 function summarize(r: SavedSearchRow): string {
   const p = r.params;
   const parts: string[] = [p.mode === "sale" ? "Sale" : "Rent"];
-  if (p.type && p.type !== "any") parts.push(p.type);
+  const types = parsePropertyTypes(p.type);
+  if (types.length) parts.push(types.map((t) => PROPERTY_TYPE_LABEL[t]).join("/"));
   if (p.q) parts.push(`"${p.q}"`);
   if (p.max && p.max > 0) parts.push(`≤ ₹${p.max.toLocaleString("en-IN")}`);
   if (p.furn && p.furn !== "any") parts.push(p.furn);
   return parts.join(" · ");
 }
-
-// Prevent unused import warning
-void Loader2;

@@ -28,7 +28,15 @@ export function CompareToggle({ id, title }: { id: string; title: string }) {
           : "bg-card/95 text-ink hover:text-primary"
       }`}
     >
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <svg
+        viewBox="0 0 24 24"
+        className="h-4 w-4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      >
         <path d="M8 3 4 7l4 4" />
         <path d="M4 7h16" />
         <path d="m16 21 4-4-4-4" />

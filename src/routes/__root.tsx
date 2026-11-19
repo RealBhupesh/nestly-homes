@@ -6,12 +6,25 @@ import {
   useRouter,
   HeadContent,
   Scripts,
+  useRouterState,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
+import { initMonitoring } from "../lib/monitoring";
 import { CompareTray } from "@/components/nestly/CompareTray";
+import { SiteFooter } from "@/components/nestly/SiteFooter";
+import {
+  SITE_NAME,
+  SITE_URL,
+  SITE_TAGLINE,
+  SITE_DESCRIPTION,
+  OG_IMAGE_URL,
+  SUPPORT_EMAIL,
+  absoluteUrl,
+  shouldShowSiteFooter,
+} from "@/lib/site";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
@@ -74,23 +87,69 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
   );
 }
 
+const DEFAULT_TITLE = `${SITE_NAME} — ${SITE_TAGLINE}`;
+
+// Organization + WebSite (with sitelinks search box) structured data.
+const STRUCTURED_DATA = {
+  "@context": "https://schema.org",
+  "@graph": [
+    {
+      "@type": "Organization",
+      "@id": `${SITE_URL}/#organization`,
+      name: SITE_NAME,
+      url: absoluteUrl("/"),
+      logo: absoluteUrl("/favicon.ico"),
+      email: SUPPORT_EMAIL,
+      areaServed: { "@type": "City", name: "Pune" },
+    },
+    {
+      "@type": "WebSite",
+      "@id": `${SITE_URL}/#website`,
+      url: absoluteUrl("/"),
+      name: SITE_NAME,
+      description: SITE_DESCRIPTION,
+      inLanguage: "en-IN",
+      publisher: { "@id": `${SITE_URL}/#organization` },
+      potentialAction: {
+        "@type": "SearchAction",
+        target: {
+          "@type": "EntryPoint",
+          urlTemplate: `${SITE_URL}/search?q={search_term_string}`,
+        },
+        "query-input": "required name=search_term_string",
+      },
+    },
+  ],
+};
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { name: "theme-color", content: "#FFFBF6" },
-      { title: "Nestly — Rent or buy a home, without the brokers" },
-      { name: "description", content: "Nestly is the direct-from-owner way to find rooms, flats and houses to rent or buy. Fresh listings, verified owners, no middlemen." },
-      { property: "og:title", content: "Nestly — Rent or buy a home, without the brokers" },
-      { property: "og:description", content: "Nestly is the direct-from-owner way to find rooms, flats and houses to rent or buy. Fresh listings, verified owners, no middlemen." },
+      { name: "theme-color", content: "#eeeeee" },
+      { title: DEFAULT_TITLE },
+      { name: "description", content: SITE_DESCRIPTION },
+      { property: "og:site_name", content: SITE_NAME },
       { property: "og:type", content: "website" },
-      { property: "og:site_name", content: "Nestly" },
+      { property: "og:locale", content: "en_IN" },
+      { property: "og:title", content: DEFAULT_TITLE },
+      { property: "og:description", content: SITE_DESCRIPTION },
+      { property: "og:url", content: absoluteUrl("/") },
+      { property: "og:image", content: OG_IMAGE_URL },
+      { property: "og:image:width", content: "1600" },
+      { property: "og:image:height", content: "1200" },
+      { property: "og:image:alt", content: "A bright, furnished room listed on Nestly" },
       { name: "twitter:card", content: "summary_large_image" },
-      { name: "twitter:title", content: "Nestly — Rent or buy a home, without the brokers" },
-      { name: "twitter:description", content: "Nestly is the direct-from-owner way to find rooms, flats and houses to rent or buy. Fresh listings, verified owners, no middlemen." },
-      { property: "og:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63430467-4957-4550-b1b5-d8a193103800/id-preview-b506eaf1--e9f9d4e5-4502-4b5e-8665-9d89f27523eb.lovable.app-1784277023227.png" },
-      { name: "twitter:image", content: "https://pub-bb2e103a32db4e198524a2e9ed8f35b4.r2.dev/63430467-4957-4550-b1b5-d8a193103800/id-preview-b506eaf1--e9f9d4e5-4502-4b5e-8665-9d89f27523eb.lovable.app-1784277023227.png" },
+      { name: "twitter:title", content: DEFAULT_TITLE },
+      { name: "twitter:description", content: SITE_DESCRIPTION },
+      { name: "twitter:image", content: OG_IMAGE_URL },
+    ],
+    scripts: [
+      {
+        type: "application/ld+json",
+        children: JSON.stringify(STRUCTURED_DATA),
+      },
     ],
     links: [
       {
@@ -114,7 +173,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 
 function RootShell({ children }: { children: ReactNode }) {
   return (
-    <html lang="en">
+    <html lang="en-IN">
       <head>
         <HeadContent />
       </head>
@@ -128,11 +187,24 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const pathname = useRouterState({ select: (st) => st.location.pathname });
+
+  // The footer depends on the pathname, which can change before hydration
+  // (e.g. a signed-out visit to /dashboard redirects to /auth on the client).
+  // Rendering it only after mount keeps server and client HTML identical.
+  const [hydrated, setHydrated] = useState(false);
+
+  useEffect(() => {
+    setHydrated(true);
+    // Lazy-loads Sentry only when VITE_SENTRY_DSN is configured.
+    void initMonitoring();
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
       <Outlet />
+      {hydrated && shouldShowSiteFooter(pathname) && <SiteFooter />}
       <CompareTray />
       <Toaster richColors position="top-center" />
     </QueryClientProvider>
