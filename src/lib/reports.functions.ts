@@ -46,7 +46,7 @@ const reportSchema = z.object({
 
 export const submitReport = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => reportSchema.parse(input))
+  .validator((input: unknown) => reportSchema.parse(input))
   .handler(async ({ data, context }) => {
     const admin = await getAdmin();
 
@@ -108,7 +108,7 @@ export interface AdminReport extends ContentReportRow {
 
 export const listReportsAdmin = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         status: z.enum([...REPORT_STATUSES, "all"] as [string, ...string[]]).default("open"),
@@ -213,7 +213,7 @@ export const listReportsAdmin = createServerFn({ method: "GET" })
 
 export const setReportStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ id: z.string().uuid(), status: z.enum(REPORT_STATUSES) }).parse(input),
   )
   .handler(async ({ data, context }) => {
