@@ -91,7 +91,7 @@ const deleteSchema = z.object({ confirm: z.literal("DELETE") });
 
 export const deleteMyAccount = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => deleteSchema.parse(input))
+  .validator((input: unknown) => deleteSchema.parse(input))
   .handler(async ({ context }) => {
     const uid = context.userId;
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
