@@ -67,7 +67,7 @@ const createSlotsSchema = z.object({
 
 export const createTourSlots = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => createSlotsSchema.parse(input))
+  .validator((input: unknown) => createSlotsSchema.parse(input))
   .handler(async ({ data, context }) => {
     const rows = data.slots
       .filter((s) => new Date(s.endsAt) > new Date(s.startsAt))
@@ -90,7 +90,7 @@ export const createTourSlots = createServerFn({ method: "POST" })
 
 export const deleteTourSlot = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { slotId: string }) => ({ slotId: uuid.parse(input.slotId) }))
+  .validator((input: { slotId: string }) => ({ slotId: uuid.parse(input.slotId) }))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("tour_slots")
@@ -105,7 +105,7 @@ export const deleteTourSlot = createServerFn({ method: "POST" })
 
 export const listSlotsForListing = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { listingId: string }) => ({
+  .validator((input: { listingId: string }) => ({
     listingId: z.string().min(1).max(200).parse(input.listingId),
   }))
   .handler(async ({ data, context }) => {
@@ -154,7 +154,7 @@ const bookSchema = z.object({
 
 export const bookTour = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => bookSchema.parse(input))
+  .validator((input: unknown) => bookSchema.parse(input))
   .handler(async ({ data, context }) => {
     if (!data.slotId && !data.proposedAt) throw new Error("Pick a time slot or propose a date.");
 
@@ -257,7 +257,7 @@ const statusSchema = z.object({
 
 export const setBookingStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => statusSchema.parse(input))
+  .validator((input: unknown) => statusSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { data: booking } = await context.supabase
       .from("tour_bookings")
