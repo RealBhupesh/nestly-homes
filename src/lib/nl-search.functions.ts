@@ -39,7 +39,7 @@ export type ParsedFilters = z.infer<typeof FilterSchema>;
 
 export const parseNaturalSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((raw: unknown) => InputSchema.parse(raw))
+  .validator((raw: unknown) => InputSchema.parse(raw))
   .handler(async ({ data, context }) => {
     const { chatCompletion, parseModelJson } = await import("@/lib/ai.server");
     const { enforceRateLimit } = await import("@/lib/rate-limit");
