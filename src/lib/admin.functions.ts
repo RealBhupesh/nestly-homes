@@ -107,7 +107,7 @@ export const getAdminOverview = createServerFn({ method: "GET" })
 
 export const listAllListings = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         status: z.enum(["all", "draft", "published", "archived"]).default("all"),
@@ -134,7 +134,7 @@ export const listAllListings = createServerFn({ method: "GET" })
 
 export const setListingStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         id: z.string().uuid(),
@@ -158,7 +158,7 @@ export const setListingStatus = createServerFn({ method: "POST" })
 
 export const deleteListingAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -170,7 +170,7 @@ export const deleteListingAdmin = createServerFn({ method: "POST" })
 
 export const bulkSetListingStatus = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         ids: z.array(z.string().uuid()).min(1).max(500),
@@ -195,7 +195,7 @@ export const bulkSetListingStatus = createServerFn({ method: "POST" })
 
 export const bulkDeleteListings = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
+  .validator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -209,7 +209,7 @@ export const bulkDeleteListings = createServerFn({ method: "POST" })
 
 export const setListingFeatured = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid(), featured: z.boolean() }).parse(i))
+  .validator((i) => z.object({ id: z.string().uuid(), featured: z.boolean() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -226,7 +226,7 @@ export const setListingFeatured = createServerFn({ method: "POST" })
 
 export const bulkSetListingFeatured = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         ids: z.array(z.string().uuid()).min(1).max(500),
@@ -265,7 +265,7 @@ export const listAllReviews = createServerFn({ method: "GET" })
 
 export const deleteReviewAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -277,7 +277,7 @@ export const deleteReviewAdmin = createServerFn({ method: "POST" })
 
 export const listAllUsers = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ q: z.string().optional().default("") }).parse(i))
+  .validator((i) => z.object({ q: z.string().optional().default("") }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -307,7 +307,7 @@ export const listAllUsers = createServerFn({ method: "GET" })
 
 export const setUserRole = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         userId: z.string().uuid(),
@@ -350,7 +350,7 @@ export const setUserRole = createServerFn({ method: "POST" })
 
 export const getAdminTimeseries = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ days: z.number().int().min(7).max(90).default(30) }).parse(i))
+  .validator((i) => z.object({ days: z.number().int().min(7).max(90).default(30) }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -479,7 +479,7 @@ export const listAllPhotos = createServerFn({ method: "GET" })
 
 export const deletePhotoAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -528,7 +528,7 @@ export const listAllSavedSearches = createServerFn({ method: "GET" })
 
 export const bulkDeleteReviews = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
+  .validator((i) => z.object({ ids: z.array(z.string().uuid()).min(1).max(500) }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -546,7 +546,7 @@ export const bulkDeleteReviews = createServerFn({ method: "POST" })
 
 export const getUserDetail = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ userId: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ userId: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -592,7 +592,7 @@ export const getUserDetail = createServerFn({ method: "GET" })
 
 export const setUserBan = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ userId: z.string().uuid(), ban: z.boolean() }).parse(i))
+  .validator((i) => z.object({ userId: z.string().uuid(), ban: z.boolean() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     if (data.userId === context.userId) throw new Error("You cannot ban yourself.");
@@ -613,7 +613,7 @@ export const setUserBan = createServerFn({ method: "POST" })
 
 export const deleteUserAdmin = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ userId: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ userId: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     if (data.userId === context.userId) throw new Error("You cannot delete yourself.");
@@ -626,7 +626,7 @@ export const deleteUserAdmin = createServerFn({ method: "POST" })
 
 export const addUserNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z.object({ userId: z.string().uuid(), body: z.string().min(1).max(2000) }).parse(i),
   )
   .handler(async ({ context, data }) => {
@@ -643,7 +643,7 @@ export const addUserNote = createServerFn({ method: "POST" })
 
 export const deleteUserNote = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) => z.object({ id: z.string().uuid() }).parse(i))
+  .validator((i) => z.object({ id: z.string().uuid() }).parse(i))
   .handler(async ({ context, data }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -658,7 +658,7 @@ export const deleteUserNote = createServerFn({ method: "POST" })
 
 export const listAuditLog = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z
       .object({
         q: z.string().optional().default(""),
@@ -703,7 +703,7 @@ export const listFeatureFlags = createServerFn({ method: "GET" })
 
 export const setFeatureFlag = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((i) =>
+  .validator((i) =>
     z.object({ key: z.string().min(1).max(64), enabled: z.boolean() }).parse(i),
   )
   .handler(async ({ context, data }) => {
