@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef } from "react";
 import Supercluster from "supercluster";
 import type { GeoListing, Listing } from "@/lib/listings-data";
 import { formatMoney, hasCoords } from "@/lib/listings-data";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 
 interface Props {
   listings: Listing[];
@@ -86,7 +87,8 @@ export function ListingsMap({
     if (mapRef.current) {
       // Re-render with the new index synchronously via next microtask.
       (async () => {
-        const maplibregl = (await import("maplibre-gl")).default;
+        const maplibregl = await import("maplibre-gl");
+        maplibregl.setWorkerUrl(maplibreWorkerUrl);
         renderMarkers(maplibregl);
       })();
     }
@@ -97,7 +99,8 @@ export function ListingsMap({
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
+        maplibregl.setWorkerUrl(maplibreWorkerUrl);
       await import("maplibre-gl/dist/maplibre-gl.css");
       if (cancelled || !containerRef.current) return;
 
@@ -163,7 +166,8 @@ export function ListingsMap({
   useEffect(() => {
     if (!mapRef.current) return;
     (async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
+        maplibregl.setWorkerUrl(maplibreWorkerUrl);
       renderMarkers(maplibregl);
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -180,7 +184,8 @@ export function ListingsMap({
   useEffect(() => {
     if (!mapRef.current) return;
     (async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
+        maplibregl.setWorkerUrl(maplibreWorkerUrl);
       const map = mapRef.current;
       if (flyMarkerRef.current) {
         flyMarkerRef.current.remove();
