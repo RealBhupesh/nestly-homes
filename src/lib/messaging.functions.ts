@@ -73,7 +73,7 @@ const openSchema = z.object({
 
 export const openConversation = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => openSchema.parse(input))
+  .validator((input: unknown) => openSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { getDbListing, getDisplayName } = await import("@/lib/notify.server");
     const listing = await getDbListing(data.listingId);
@@ -133,7 +133,7 @@ export const openConversation = createServerFn({ method: "POST" })
 
 export const listMessages = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { conversationId: string }) => ({
+  .validator((input: { conversationId: string }) => ({
     conversationId: z.string().uuid().parse(input.conversationId),
   }))
   .handler(async ({ data, context }) => {
@@ -157,7 +157,7 @@ const sendSchema = z.object({
 
 export const sendMessage = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => sendSchema.parse(input))
+  .validator((input: unknown) => sendSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { enforceRateLimit } = await import("@/lib/rate-limit");
     await enforceRateLimit(
@@ -190,7 +190,7 @@ export const sendMessage = createServerFn({ method: "POST" })
 
 export const markConversationRead = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { conversationId: string }) => ({
+  .validator((input: { conversationId: string }) => ({
     conversationId: z.string().uuid().parse(input.conversationId),
   }))
   .handler(async ({ data, context }) => {
@@ -220,7 +220,7 @@ export const markConversationRead = createServerFn({ method: "POST" })
 
 export const setPhoneRevealed = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { conversationId: string; revealed: boolean }) => ({
+  .validator((input: { conversationId: string; revealed: boolean }) => ({
     conversationId: z.string().uuid().parse(input.conversationId),
     revealed: z.boolean().parse(input.revealed),
   }))
