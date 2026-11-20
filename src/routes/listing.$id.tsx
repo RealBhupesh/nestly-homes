@@ -1139,4 +1139,4 @@ function ListingSkeleton() {
       </div>
     </main>
   );
-                      }
+}
