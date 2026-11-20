@@ -63,7 +63,7 @@ const submitSchema = z.object({
 
 export const submitVerification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => submitSchema.parse(input))
+  .validator((input: unknown) => submitSchema.parse(input))
   .handler(async ({ data, context }) => {
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
 
@@ -134,7 +134,7 @@ export const submitVerification = createServerFn({ method: "POST" })
 
 export const listVerifications = createServerFn({ method: "GET" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { status?: string } | undefined) => ({
+  .validator((input: { status?: string } | undefined) => ({
     status: z
       .enum(["all", "pending", "approved", "rejected"])
       .default("pending")
@@ -172,7 +172,7 @@ const decideSchema = z.object({
 
 export const decideVerification = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => decideSchema.parse(input))
+  .validator((input: unknown) => decideSchema.parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");
@@ -199,7 +199,7 @@ export const decideVerification = createServerFn({ method: "POST" })
   });
 
 export const getVerifiedOwners = createServerFn({ method: "GET" })
-  .inputValidator((input: { ids: string[] }) => ({
+  .validator((input: { ids: string[] }) => ({
     ids: z.array(z.string().uuid()).max(100).parse(input.ids),
   }))
   .handler(async ({ data }) => {
@@ -216,7 +216,7 @@ export const getVerifiedOwners = createServerFn({ method: "GET" })
 /** Admin-only: short-lived (5 min) signed URL for a request's private ID document. */
 export const getVerificationDocumentUrl = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().uuid() }).parse(input))
   .handler(async ({ data, context }) => {
     await assertAdmin(context);
     const { supabaseAdmin } = await import("@/integrations/supabase/client.server");

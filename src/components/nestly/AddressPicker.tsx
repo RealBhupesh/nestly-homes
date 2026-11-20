@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Loader2, MapPin, Search } from "lucide-react";
 import type { Map as MapLibreMap, MapMouseEvent, Marker } from "maplibre-gl";
+import maplibreWorkerUrl from "maplibre-gl/dist/maplibre-gl-worker.mjs?url";
 
 interface Coords {
   lat: number;
@@ -37,7 +38,8 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
   useEffect(() => {
     let cancelled = false;
     (async () => {
-      const maplibregl = (await import("maplibre-gl")).default;
+      const maplibregl = await import("maplibre-gl");
+      maplibregl.setWorkerUrl(maplibreWorkerUrl);
       await import("maplibre-gl/dist/maplibre-gl.css");
       if (cancelled || !containerRef.current) return;
 
@@ -70,22 +72,22 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
         if (markerRef.current) markerRef.current.remove();
         const el = document.createElement("div");
         el.className = "nestly-address-pin";
-        markerRef.current = new maplibregl.Marker({
+        const marker = new maplibregl.Marker({
           element: el,
           draggable: true,
           anchor: "bottom",
         })
           .setLngLat([lng, lat])
           .addTo(map);
-        markerRef.current.on("dragend", () => {
-          const p = markerRef.current?.getLngLat();
+        markerRef.current = marker;
+        marker.on("dragend", () => {
+          const p = marker.getLngLat();
           if (!p) return;
           void reverseGeocode(p.lat, p.lng);
         });
       };
 
       if (value) placeMarker(value.lng, value.lat);
-
       map.on("click", (e: MapMouseEvent) => {
         placeMarker(e.lngLat.lng, e.lngLat.lat);
         void reverseGeocode(e.lngLat.lat, e.lngLat.lng);
@@ -147,7 +149,8 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
       mapRef.current?.flyTo({ center: [lng, lat], zoom: 16 });
       // Simulate a click so we drop a marker + reverse geocode for structured fields
       if (mapRef.current) {
-        const maplibregl = (await import("maplibre-gl")).default;
+        const maplibregl = await import("maplibre-gl");
+      maplibregl.setWorkerUrl(maplibreWorkerUrl);
         if (markerRef.current) markerRef.current.remove();
         const el = document.createElement("div");
         el.className = "nestly-address-pin";
@@ -187,7 +190,7 @@ export function AddressPicker({ value, onChange, initialCenter }: Props) {
       </form>
 
       <div className="relative h-72 overflow-hidden rounded-lg border border-border/70 bg-muted">
-        <div ref={containerRef} className="absolute inset-0" />
+        <div ref={containerRef} className="h-full w-full" />
         {loading && (
           <div className="pointer-events-none absolute bottom-2 left-2 inline-flex items-center gap-1.5 rounded-full bg-background/90 px-2.5 py-1 text-[11px] text-ink/70 shadow-sm">
             <Loader2 className="h-3 w-3 animate-spin" /> Looking up address…

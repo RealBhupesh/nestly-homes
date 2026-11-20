@@ -106,7 +106,7 @@ export interface SearchListingsResult {
 }
 
 export const searchListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => searchSchema.parse(input ?? {}))
+  .validator((input: unknown) => searchSchema.parse(input ?? {}))
   .handler(async ({ data }): Promise<SearchListingsResult> => {
     const admin = await getAdmin();
     const empty: SearchListingsResult = {
@@ -201,7 +201,7 @@ export const searchListings = createServerFn({ method: "GET" })
 // ---------------------------------------------------------------------------
 
 export const getListing = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) => z.object({ id: z.string().max(100) }).parse(input))
+  .validator((input: unknown) => z.object({ id: z.string().max(100) }).parse(input))
   .handler(async ({ data }): Promise<Listing | null> => {
     if (!isUuid(data.id)) return null;
     const admin = await getAdmin();
@@ -222,7 +222,7 @@ export const getListing = createServerFn({ method: "GET" })
 // ---------------------------------------------------------------------------
 
 export const getFeaturedListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ limit: z.number().int().min(1).max(24).default(8) }).parse(input ?? {}),
   )
   .handler(async ({ data }): Promise<Listing[]> => {
@@ -243,7 +243,7 @@ export const getFeaturedListings = createServerFn({ method: "GET" })
 // ---------------------------------------------------------------------------
 
 export const getSimilarListings = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({ id: z.string().max(100), limit: z.number().int().min(1).max(12).default(6) })
       .parse(input),
@@ -301,7 +301,7 @@ export const getSimilarListings = createServerFn({ method: "GET" })
 // ---------------------------------------------------------------------------
 
 export const getListingsByIds = createServerFn({ method: "GET" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ ids: z.array(z.string().max(100)).max(12) }).parse(input),
   )
   .handler(async ({ data }): Promise<Listing[]> => {

@@ -44,7 +44,7 @@ export const listSavedSearches = createServerFn({ method: "GET" })
 
 export const createSavedSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator(
+  .validator(
     (input: { name: string; params: SavedSearchParams; alertFrequency?: AlertFrequency }) => ({
       name: input.name.trim().slice(0, 80) || "Untitled search",
       params: paramsSchema.parse(input.params ?? {}),
@@ -68,7 +68,7 @@ export const createSavedSearch = createServerFn({ method: "POST" })
 
 export const setSavedSearchAlert = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string; frequency: AlertFrequency }) => ({
+  .validator((input: { id: string; frequency: AlertFrequency }) => ({
     id: z.string().uuid().parse(input.id),
     frequency: alertSchema.parse(input.frequency),
   }))
@@ -83,7 +83,7 @@ export const setSavedSearchAlert = createServerFn({ method: "POST" })
 
 export const deleteSavedSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string }) => ({ id: z.string().uuid().parse(input.id) }))
+  .validator((input: { id: string }) => ({ id: z.string().uuid().parse(input.id) }))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase.from("saved_searches").delete().eq("id", data.id);
     if (error) throw new Error(error.message);
@@ -92,7 +92,7 @@ export const deleteSavedSearch = createServerFn({ method: "POST" })
 
 export const touchSavedSearch = createServerFn({ method: "POST" })
   .middleware([requireSupabaseAuth])
-  .inputValidator((input: { id: string }) => ({ id: z.string().uuid().parse(input.id) }))
+  .validator((input: { id: string }) => ({ id: z.string().uuid().parse(input.id) }))
   .handler(async ({ data, context }) => {
     const { error } = await context.supabase
       .from("saved_searches")

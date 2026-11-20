@@ -21,8 +21,10 @@ export const Route = createFileRoute("/_authenticated/dashboard/inbox")({
       { name: "robots", content: "noindex" },
     ],
   }),
-  errorComponent: ({ error }) => (
-    <div className="p-8 text-center text-ink/70">Inbox unavailable: {error.message}</div>
+  errorComponent: ({ error }: { error: unknown }) => (
+    <div className="p-8 text-center text-ink/70">
+      Inbox unavailable: {error instanceof Error ? error.message : "Unknown error"}
+    </div>
   ),
   notFoundComponent: () => <div className="p-8 text-center text-ink/70">Not found</div>,
   component: InboxPage,

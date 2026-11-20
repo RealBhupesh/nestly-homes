@@ -146,10 +146,10 @@ export const Route = createFileRoute("/listing/$id")({
     };
   },
   pendingComponent: ListingSkeleton,
-  errorComponent: ({ error }) => (
+  errorComponent: ({ error }: { error: unknown }) => (
     <div className="mx-auto max-w-xl px-6 pt-16 text-center">
       <h1 className="font-display text-2xl font-semibold text-ink">Something went wrong</h1>
-      <p className="mt-2 text-ink/60">{error.message}</p>
+      <p className="mt-2 text-ink/60">{error instanceof Error ? error.message : "Unknown error"}</p>
       <Link
         to="/search"
         search={{ mode: "rent" }}
